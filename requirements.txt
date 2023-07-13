@@ -35,3 +35,5 @@ tushare
 
 transformers
 peft
+openbb
+sentencepiece
