@@ -33,7 +33,7 @@ headers = {
 # bloomberg scraper fn
 # ----------------------------
 def scrape_bloomberg(subject, page_number, headers, proxies):
-    full_url = 'https://www.bloomberg.com/search?query=' + subject + '&sort=time:desc' + '&page=' + str(page_number)
+    full_url = 'https://www.bloomberg.com/search?query=' + subject + '&sort=time:asc&startTime=2014-01-01T01:01:01.001Z&' + '&page=' + str(page_number) # https://www.bloomberg.com/search?query=%27barclays%27&sort=time:asc&startTime=2014-01-01T01:01:01.001Z&page=10
     response = requests.get(full_url, headers=headers, proxies = proxies)
     soup = BeautifulSoup(response.content, 'html.parser')
     #dates = [''.join(s.findAll(text=True))for s in soup.findAll(['time'])]
