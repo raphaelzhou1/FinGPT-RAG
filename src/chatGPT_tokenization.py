@@ -17,7 +17,7 @@ def extract_keywords(text):
 
     payload = {
         'model': 'text-davinci-003',
-        'prompt': f'Extract keywords from this text. Make the first letter of every word uppercase and separate with commas:\n\n{text}',
+        'prompt': f'Extract only 6 most important keywords from this text:\n\n{text}',
         'temperature': 0.5,
         'max_tokens': 60,
         'top_p': 1.0,
