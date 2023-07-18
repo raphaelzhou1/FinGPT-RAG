@@ -10,6 +10,31 @@ from difflib import SequenceMatcher
 
 load_dotenv()
 
+# Sentence Tokenization methods:
+def split_sentence(sentence):
+    ticker = []
+    url = []
+    remaining_sentence = sentence
+
+    # Split based on $
+    if '$' in sentence:
+        parts = sentence.split()
+        for word in parts:
+            if '$' in word:
+                ticker.append(word.strip('$'))
+                remaining_sentence = remaining_sentence.replace(word, '').strip()
+
+    # Split based on http
+    if 'http' in remaining_sentence:
+        parts = remaining_sentence.split()
+        for word in parts:
+            if 'http' in word:
+                url.append(word)
+                remaining_sentence = remaining_sentence.replace(word, '').strip()
+
+    return ticker, remaining_sentence, url
+
+
 # Classification methods:
 def extract_classification(text, classification_prompt):
     print("Extracting classification for", text)
@@ -171,6 +196,64 @@ def scrape_wsj(subject):
 
 def scrape_seeking_alpha(subject):
     client = ZenRowsClient("6026db40fdbc3db28235753087be6225f047542f")
+    params = {"js_render":"true","antibot":"true"}
+    url_encoded_subject = url_encode_string(subject)
+
+    full_url = 'https://seekingalpha.com/search?q=' + url_encoded_subject + '&tab=headlines'
+    print("Trying url " + full_url)
+    response = requests.get(full_url)
+    soup = BeautifulSoup(response.content, 'html.parser')
+
+    print("Trying to find post list div", soup.text)
+
+    post_list_div = soup.find('div', {'data-test-id': 'post-list'})
+    if post_list_div:
+        article_elements = post_list_div.find_all('article')
+        links = [a['href'] for article in article_elements for a in article.select('a')]
+        print("Found " + str(len(links)) + " links")
+    else:
+        print("Post list div not found")
+
+    for link in links:
+        full_link = "https://seekingalpha.com/" + link
+        print("Link:", full_link)
+
+        response = requests.get(full_link)
+        soup = BeautifulSoup(response.content, 'html.parser')
+
+        news_format = "type_1" # https://www.reuters.com/article/idUSKCN20K2SM
+        # try:
+        headline_element = soup.select_one('h1[data-test-id="post-title"]')
+        headline_text = headline_element.text.strip()
+        print("Headline:", headline_text)
+        # except AttributeError:
+        #     headline_element = soup.select_one('h1[class^="text__text__"]')
+        #     headline_text = headline_element.text.strip()
+        #     print("Headline:", headline_text)
+        #     news_format = "type_2" # https://www.reuters.com/article/idUSKBN2KT0BX
+
+        similarity = similarity_score(subject, headline_text)
+        if similarity > 0.8:
+            # if news_format == "type_1":
+            print("Relevant")
+            paragraph_elements = soup.select('p[class^="Paragraph-paragraph-"]')
+            paragraph_text = ' '.join([p.text.strip() for p in paragraph_elements])
+            print("Text:", paragraph_text)
+            return full_link, subject + ". With full context: " + paragraph_text
+            # elif news_format == "type_2":
+            #     print("Relevant")
+            #     paragraph_elements = soup.select('p[class^="text__text__"]')
+            #     paragraph_text = ' '.join([p.text.strip() for p in paragraph_elements])
+            #     print("Text:", paragraph_text)
+            #     return full_link, subject + ". With full context: " + paragraph_text
+        else:
+            print("Not relevant")
+
+    print("Context not found in Seeking Alpha")
+    return "N/A", subject
+
+def scrape_yahoo(subject):
+    client = ZenRowsClient("6026db40fdbc3db28235753087be6225f047542f")
     params = {"premium_proxy": "true", "proxy_country": "us"}
     url_encoded_subject = url_encode_string(subject)
 
@@ -279,31 +362,32 @@ def select_column_and_classify():
 
                 for row_index, row in df.iloc[1:].iterrows():
                     target_sentence = row[selected_column]
+                    ticker, remaining_sentence, link = split_sentence(target_sentence)
 
                     # Perform scraping based on classification_response
                     if row[classification_column] == "Twitter":
                         # Perform Twitter scraping
                         df.at[row_index, "link"] = "N/A"  # Put "N/A" under "link"
-                        df.at[row_index, "contextualized_sentence"] = target_sentence  # Copy "target_sentence"
+                        df.at[row_index, "contextualized_sentence"] = remaining_sentence  # Copy "target_sentence"
 
                     elif row[classification_column] == "Reuters":
                         # Perform Reuters scraping
-                        url, contextualized_sentence = scrape_reuters(target_sentence)
+                        url, contextualized_sentence = scrape_reuters(remaining_sentence)
                         df.at[row_index, "link"] = url
                         df.at[row_index, "contextualized_sentence"] = contextualized_sentence
                     elif row[classification_column] == "WSJ":
                         # Perform WSJ scraping
-                        url, contextualized_sentence = scrape_wsj(target_sentence)
+                        url, contextualized_sentence = scrape_wsj(remaining_sentence)
                         df.at[row_index, "link"] = url
                         df.at[row_index, "contextualized_sentence"] = contextualized_sentence
                     elif row[classification_column] == "Seeking Alpha":
                         # Perform Seeking Alpha scraping
-                        url, contextualized_sentence = scrape_seeking_alpha(target_sentence)
+                        url, contextualized_sentence = scrape_seeking_alpha(remaining_sentence)
                         df.at[row_index, "link"] = url
                         df.at[row_index, "contextualized_sentence"] = contextualized_sentence
                     else:
                         df.at[row_index, "link"] = "N/A"  # Put "N/A" under "link"
-                        df.at[row_index, "contextualized_sentence"] = target_sentence  # Copy "target_sentence"
+                        df.at[row_index, "contextualized_sentence"] = remaining_sentence  # Copy "target_sentence"
 
             output_file_path = os.path.splitext(file_path)[0] + "_contextualized.csv"
             df.to_csv(output_file_path, index=False)
