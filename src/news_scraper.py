@@ -11,7 +11,7 @@ from difflib import SequenceMatcher
 load_dotenv()
 
 # Classification methods:
-def extract_classification(text):
+def extract_classification(text, classification_prompt):
     print("Extracting classification for", text)
     api_key = os.getenv('OPENAI_API_KEY')
     api_url = os.getenv('OPENAI_API_URL')
@@ -23,7 +23,7 @@ def extract_classification(text):
 
     payload = {
         'model': 'text-davinci-003',
-        'prompt': f'"\n\n{text}." For news above, determine its origin. Only print "Twitter" or "Seeking Alpha" or "Reuters" or "WSJ"',
+        'prompt': f'"\n\n{text} {classification_prompt}"',
         'temperature': 0.5,
         'max_tokens': 60,
         'top_p': 1.0,
@@ -239,10 +239,16 @@ def select_column_and_classify():
                 raise ValueError("Invalid column selection")
 
             df["classification"] = ""  # Create a new column named "classification"
+            default_classification_prompt = ". For news above, determine its origin. Only print \"Twitter\" or \"Seeking Alpha\" or \"Reuters\" or \"WSJ\""
+            classification_prompt = gui.enterbox("Modify the classification prompt:", "Custom Classification Prompt",
+                                                 default_classification_prompt)
+
+            if not classification_prompt:
+                classification_prompt = default_classification_prompt
 
             for row_index, row in df.iloc[1:].iterrows():
                 target_sentence = row[selected_column]
-                classification_response = extract_classification(target_sentence)
+                classification_response = extract_classification(target_sentence, classification_prompt)
                 df.at[row_index, "classification"] = classification_response  # Assign classification response to the new column
 
             output_file_path = os.path.splitext(file_path)[0] + "_classified.csv"
@@ -299,6 +305,7 @@ def select_column_and_classify():
             gui.msgbox("Scraping Complete")
     except Exception as e:
         gui.exceptionbox(str(e))
+
 
 
 def browse_csv_file():
