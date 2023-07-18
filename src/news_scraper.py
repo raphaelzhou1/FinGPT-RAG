@@ -1,4 +1,5 @@
 import os
+import random
 import urllib.parse
 from dotenv import load_dotenv
 import pandas as pd
@@ -75,6 +76,14 @@ def url_encode_string(input_string):
 def similarity_score(a, b):
     return SequenceMatcher(None, a, b).ratio()
 
+def requests_get_with_proxy(url, proxy=None):
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/113.0',
+        'Referer': f'https://seekingalpha.com/search?q=&tab=headlines'
+    }
+    response = requests.get(url, headers=headers)
+    return response
+
 def scrape_bloomberg(subject):
     client = ZenRowsClient("6026db40fdbc3db28235753087be6225f047542f")
     params = {"premium_proxy": "true", "proxy_country": "us"}
@@ -83,7 +92,7 @@ def scrape_bloomberg(subject):
     full_url = 'https://www.bloomberg.com/search?query=' + url_encoded_subject + '&sort=relevance:asc&startTime=2015-04-01T01:01:01.001Z&' + '&page=' + str(
         1)
     print("Trying url " + full_url)
-    response = client.get(full_url, params=params)
+    response = requests_get_with_proxy(full_url)
     print("Response code: " + str(response.status_code))
     soup = BeautifulSoup(response.content, 'html.parser')
     links = [a['href'] for a in soup.select('a[class^="headline_"]') if 'href' in a.attrs]
@@ -99,7 +108,7 @@ def scrape_reuters(subject):
 
     full_url = 'https://www.reuters.com/search/news?blob=' + url_encoded_subject
     print("Trying url " + full_url)
-    response = requests.get(full_url)
+    response = requests_get_with_proxy(full_url)
     soup = BeautifulSoup(response.content, 'html.parser')
     link_elements = soup.select('h3.search-result-title > a')
     links = [link['href'] for link in link_elements]
@@ -109,7 +118,7 @@ def scrape_reuters(subject):
         full_link = "https://www.reuters.com" + link
         print("Link:", full_link)
 
-        response = requests.get(full_link)
+        response = requests_get_with_proxy(full_link)
         soup = BeautifulSoup(response.content, 'html.parser')
 
         news_format = "type_1" # https://www.reuters.com/article/idUSKCN20K2SM
@@ -150,7 +159,7 @@ def scrape_wsj(subject):
 
     full_url = 'https://www.wsj.com/search?query=' + url_encoded_subject + '&operator=OR&sort=relevance&duration=1y&startDate=2015%2F01%2F01&endDate=2016%2F01%2F01'
     print("Trying url " + full_url)
-    response = requests.get(full_url)
+    response = requests_get_with_proxy(full_url)
     soup = BeautifulSoup(response.content, 'html.parser')
     link_elements = soup.select('h3[class^="WSJTheme--headline"] a')
     links = [link['href'] for link in link_elements]
@@ -160,7 +169,7 @@ def scrape_wsj(subject):
         full_link = link
         print("Link:", full_link)
 
-        response = requests.get(full_link)
+        response = requests_get_with_proxy(full_link)
         soup = BeautifulSoup(response.content, 'html.parser')
 
         news_format = "type_1" # https://www.reuters.com/article/idUSKCN20K2SM
@@ -198,10 +207,11 @@ def scrape_seeking_alpha(subject):
     client = ZenRowsClient("6026db40fdbc3db28235753087be6225f047542f")
     params = {"js_render":"true","antibot":"true"}
     url_encoded_subject = url_encode_string(subject)
-
     full_url = 'https://seekingalpha.com/search?q=' + url_encoded_subject + '&tab=headlines'
     print("Trying url " + full_url)
-    response = requests.get(full_url)
+
+    response = requests_get_with_proxy(full_url)
+    print("Response: ", response.content)
     soup = BeautifulSoup(response.content, 'html.parser')
 
     print("Trying to find post list div", soup.text)
@@ -218,7 +228,7 @@ def scrape_seeking_alpha(subject):
         full_link = "https://seekingalpha.com/" + link
         print("Link:", full_link)
 
-        response = requests.get(full_link)
+        response = requests_get_with_proxy(full_link)
         soup = BeautifulSoup(response.content, 'html.parser')
 
         news_format = "type_1" # https://www.reuters.com/article/idUSKCN20K2SM
@@ -259,7 +269,7 @@ def scrape_yahoo(subject):
 
     full_url = 'https://seekingalpha.com/search?q=' + url_encoded_subject + '&tab=headlines'
     print("Trying url " + full_url)
-    response = requests.get(full_url)
+    response = requests_get_with_proxy(full_url)
     soup = BeautifulSoup(response.content, 'html.parser')
     link_elements = soup.select('a[data-test-id="post-list-item-title"]')
     links = [link['href'] for link in link_elements]
@@ -269,7 +279,7 @@ def scrape_yahoo(subject):
         full_link = "https://seekingalpha.com/" + link
         print("Link:", full_link)
 
-        response = requests.get(full_link)
+        response = requests_get_with_proxy(full_link)
         soup = BeautifulSoup(response.content, 'html.parser')
 
         news_format = "type_1" # https://www.reuters.com/article/idUSKCN20K2SM
