@@ -166,7 +166,7 @@ def scrape_wsj(subject):
         else:
             print("Not relevant")
 
-    print("Context not found in Reuters")
+    print("Context not found in WSJ")
     return "N/A", subject
 
 def scrape_seeking_alpha(subject):
@@ -217,7 +217,7 @@ def scrape_seeking_alpha(subject):
         else:
             print("Not relevant")
 
-    print("Context not found in Reuters")
+    print("Context not found in Seeking Alpha")
     return "N/A", subject
 
 
@@ -294,6 +294,11 @@ def select_column_and_classify():
                     elif row[classification_column] == "WSJ":
                         # Perform WSJ scraping
                         url, contextualized_sentence = scrape_wsj(target_sentence)
+                        df.at[row_index, "link"] = url
+                        df.at[row_index, "contextualized_sentence"] = contextualized_sentence
+                    elif row[classification_column] == "Seeking Alpha":
+                        # Perform Seeking Alpha scraping
+                        url, contextualized_sentence = scrape_seeking_alpha(target_sentence)
                         df.at[row_index, "link"] = url
                         df.at[row_index, "contextualized_sentence"] = contextualized_sentence
                     else:
