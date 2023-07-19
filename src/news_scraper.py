@@ -473,30 +473,38 @@ def select_column_and_classify():
                     else:
                         print("Financial statement: ", remaining_sentence)
 
-                    # Perform scraping based on classification_response
-                    if row[classification_column] == "Twitter":
-                        # Perform Twitter scraping
-                        df.at[row_index, "link"] = "N/A"  # Put "N/A" under "link"
-                        df.at[row_index, "contextualized_sentence"] = remaining_sentence  # Copy "target_sentence"
-
-                    elif row[classification_column] == "Reuters":
-                        # Perform Reuters scraping
+                    # Try all
+                    url, contextualized_sentence = scrape_google_for_seeking_alpha(remaining_sentence)
+                    if url == "N/A":
                         url, contextualized_sentence = scrape_reuters(remaining_sentence)
-                        df.at[row_index, "link"] = url
-                        df.at[row_index, "contextualized_sentence"] = contextualized_sentence
-                    elif row[classification_column] == "WSJ":
-                        # Perform WSJ scraping
-                        url, contextualized_sentence = scrape_wsj(remaining_sentence)
-                        df.at[row_index, "link"] = url
-                        df.at[row_index, "contextualized_sentence"] = contextualized_sentence
-                    elif row[classification_column] == "Seeking Alpha":
-                        # Perform Seeking Alpha scraping
-                        url, contextualized_sentence = scrape_google_for_seeking_alpha(remaining_sentence)
-                        df.at[row_index, "link"] = url
-                        df.at[row_index, "contextualized_sentence"] = contextualized_sentence
-                    else:
-                        df.at[row_index, "link"] = "N/A"  # Put "N/A" under "link"
-                        df.at[row_index, "contextualized_sentence"] = remaining_sentence  # Copy "target_sentence"
+                    df.at[row_index, "link"] = url
+                    df.at[row_index, "contextualized_sentence"] = contextualized_sentence
+
+                    # Try based on classification alone
+                    # # Perform scraping based on classification_response
+                    # if row[classification_column] == "Twitter":
+                    #     # Perform Twitter scraping
+                    #     df.at[row_index, "link"] = "N/A"  # Put "N/A" under "link"
+                    #     df.at[row_index, "contextualized_sentence"] = remaining_sentence  # Copy "target_sentence"
+                    #
+                    # elif row[classification_column] == "Reuters":
+                    #     # Perform Reuters scraping
+                    #     url, contextualized_sentence = scrape_reuters(remaining_sentence)
+                    #     df.at[row_index, "link"] = url
+                    #     df.at[row_index, "contextualized_sentence"] = contextualized_sentence
+                    # elif row[classification_column] == "WSJ":
+                    #     # Perform WSJ scraping
+                    #     url, contextualized_sentence = scrape_wsj(remaining_sentence)
+                    #     df.at[row_index, "link"] = url
+                    #     df.at[row_index, "contextualized_sentence"] = contextualized_sentence
+                    # elif row[classification_column] == "Seeking Alpha":
+                    #     # Perform Seeking Alpha scraping
+                    #     url, contextualized_sentence = scrape_google_for_seeking_alpha(remaining_sentence)
+                    #     df.at[row_index, "link"] = url
+                    #     df.at[row_index, "contextualized_sentence"] = contextualized_sentence
+                    # else:
+                    #     df.at[row_index, "link"] = "N/A"  # Put "N/A" under "link"
+                    #     df.at[row_index, "contextualized_sentence"] = remaining_sentence  # Copy "target_sentence"
 
             output_file_path = os.path.splitext(file_path)[0] + "_contextualized.csv"
             df.to_csv(output_file_path, index=False)
