@@ -1,5 +1,8 @@
 import os
 import random
+import time
+import json
+import html_to_json
 import urllib.parse
 from dotenv import load_dotenv
 import pandas as pd
@@ -77,12 +80,28 @@ def similarity_score(a, b):
     return SequenceMatcher(None, a, b).ratio()
 
 def requests_get_with_proxy(url, proxy=None):
+
+    sleep_time = random.randint(1, 5)
+    time.sleep(sleep_time)
+
+    user_agents = [
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/113.0',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
+        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
+        # Add more User-Agent strings as needed
+    ]
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/113.0',
-        'Referer': f'https://seekingalpha.com/search?q=&tab=headlines'
+        'User-Agent': random.choice(user_agents),
+        'Referer': 'https://seekingalpha.com/search?q=&tab=headlines'
     }
-    response = requests.get(url, headers=headers)
+
+    session = requests.Session()
+    session.headers.update(headers)
+
+    response = session.get(url, proxies=proxy)
     return response
+
 
 def scrape_bloomberg(subject):
     client = ZenRowsClient("6026db40fdbc3db28235753087be6225f047542f")
@@ -205,24 +224,36 @@ def scrape_wsj(subject):
 
 def scrape_seeking_alpha(subject):
     client = ZenRowsClient("6026db40fdbc3db28235753087be6225f047542f")
-    params = {"js_render":"true","antibot":"true"}
+    params = {"js_render": "true", "antibot": "true"}
     url_encoded_subject = url_encode_string(subject)
     full_url = 'https://seekingalpha.com/search?q=' + url_encoded_subject + '&tab=headlines'
     print("Trying url " + full_url)
 
-    response = requests_get_with_proxy(full_url)
-    print("Response: ", response.content)
-    soup = BeautifulSoup(response.content, 'html.parser')
+    # response = requests_get_with_proxy(full_url)
+    response = client.get(full_url, params=params)
 
-    print("Trying to find post list div", soup.text)
+    # JSONN parsing method
+    # json_response = html_to_json.convert(response.content)
+    # print("Response: ", response.content)
+    # print("JSON: ", json_response)
+    # response_json = json.loads(json_response)
+    # Find all the <a> tags within the specified hierarchy
+    # links = []
+    #
+    # div_main = response_json['div.main']
+    # if div_main:
+    #     div_article = div_main['div.article']
+    #     if div_article:
+    #         divs = div_article['div']
+    #         for div in divs:
+    #             if 'a' in div:
+    #                 links.append(div['a']['href'])
 
-    post_list_div = soup.find('div', {'data-test-id': 'post-list'})
-    if post_list_div:
-        article_elements = post_list_div.find_all('article')
-        links = [a['href'] for article in article_elements for a in article.select('a')]
-        print("Found " + str(len(links)) + " links")
-    else:
-        print("Post list div not found")
+    # BeautifulSoup method
+    soup = BeautifulSoup(response.content, 'html5lib')
+    print("Soup: ", soup)
+    links = [a['href'] for a in soup.select('div.main div.article div a')]
+    print("Found " + str(len(links)) + " links")
 
     for link in links:
         full_link = "https://seekingalpha.com/" + link
@@ -314,6 +345,69 @@ def scrape_yahoo(subject):
     return "N/A", subject
 
 
+def scrape_google_for_seeking_alpha(subject):
+    client = ZenRowsClient("6026db40fdbc3db28235753087be6225f047542f")
+    params = {"js_render": "true", "antibot": "true"}
+    url_encoded_subject = url_encode_string(subject)
+    full_url = 'https://www.google.com/search?q=' + url_encoded_subject + '+Seeking+Alpha'
+    print("Trying url " + full_url)
+
+    # response = requests_get_with_proxy(full_url)
+    response = requests_get_with_proxy(full_url)
+
+    links = []
+
+    soup = BeautifulSoup(response.content, 'html5lib')
+    divs = soup.find_all('div', {'class': 'yuRUbf'})
+    for child_div in divs:
+        link_element = child_div.find('a', {'href': lambda href: href and 'seekingalpha' in href})
+        if link_element:
+            link = link_element['href']
+            print("Found 1 link:", link)
+            return scrape_seeking_alpha_article_page(link, subject)
+
+    print("Link not found")
+    return "N/A", subject
+
+
+def scrape_seeking_alpha_article_page(url, subject):
+    response = requests_get_with_proxy(url)
+    soup = BeautifulSoup(response.content, 'html5lib')
+
+    news_format = "type_1" # https://www.reuters.com/article/idUSKCN20K2SM
+    # try:
+    title = soup.select('title')
+    print("title:", title)
+    headline_text = title[0].text
+    print("Headline:", headline_text)
+    # except AttributeError:
+    #     headline_element = soup.select_one('h1[class^="text__text__"]')
+    #     headline_text = headline_element.text.strip()
+    #     print("Headline:", headline_text)
+    #     news_format = "type_2" # https://www.reuters.com/article/idUSKBN2KT0BX
+
+    similarity = similarity_score(subject, headline_text)
+    if similarity > 0.8:
+        # if news_format == "type_1":
+        print("Relevant")
+
+        div = soup.find('div', {'class': 'lm-ls'})
+        ul = div.find('ul')
+        lis = ul.find_all('li')
+        paragraph_text = ' '.join([li.text.strip() for li in lis])
+        print("Text:", paragraph_text)
+        return url, subject + ". With full context: " + paragraph_text
+        # elif news_format == "type_2":
+        #     print("Relevant")
+        #     paragraph_elements = soup.select('p[class^="text__text__"]')
+        #     paragraph_text = ' '.join([p.text.strip() for p in paragraph_elements])
+        #     print("Text:", paragraph_text)
+        #     return full_link, subject + ". With full context: " + paragraph_text
+    else:
+        print("Not relevant")
+        return "N/A", subject
+
+# Function that handles classification of sentences using OpenAI and scraping of news websites
 def select_column_and_classify():
     try:
         # Classify sentences
@@ -374,6 +468,11 @@ def select_column_and_classify():
                     target_sentence = row[selected_column]
                     ticker, remaining_sentence, link = split_sentence(target_sentence)
 
+                    if link:
+                        print("Financial statement: ", remaining_sentence, "Link: ", link)
+                    else:
+                        print("Financial statement: ", remaining_sentence)
+
                     # Perform scraping based on classification_response
                     if row[classification_column] == "Twitter":
                         # Perform Twitter scraping
@@ -392,7 +491,7 @@ def select_column_and_classify():
                         df.at[row_index, "contextualized_sentence"] = contextualized_sentence
                     elif row[classification_column] == "Seeking Alpha":
                         # Perform Seeking Alpha scraping
-                        url, contextualized_sentence = scrape_seeking_alpha(remaining_sentence)
+                        url, contextualized_sentence = scrape_google_for_seeking_alpha(remaining_sentence)
                         df.at[row_index, "link"] = url
                         df.at[row_index, "contextualized_sentence"] = contextualized_sentence
                     else:
@@ -404,7 +503,9 @@ def select_column_and_classify():
             gui.msgbox("Scraping Complete")
     except Exception as e:
         gui.exceptionbox(str(e))
-
+        print("Error occurred at row index:", row_index)
+        output_file_path = os.path.splitext(file_path)[0] + "_classified.csv"
+        df.to_csv(output_file_path, index=False)
 
 
 def browse_csv_file():
