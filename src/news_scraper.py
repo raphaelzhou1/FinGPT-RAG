@@ -38,7 +38,7 @@ def split_sentence(sentence):
                 remaining_sentence = remaining_sentence.replace(word, '').strip()
 
     # Delete "- " and leading/trailing spaces
-    remaining_sentence = remaining_sentence.replace("- ", "").strip()
+    remaining_sentence = remaining_sentence.replace("- ", "").replace(" ", "").replace("\n", "").strip()
 
     return ticker, remaining_sentence, url
 
