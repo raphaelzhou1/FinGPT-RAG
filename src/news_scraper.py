@@ -77,7 +77,19 @@ def url_encode_string(input_string):
     return encoded_string
 
 def similarity_score(a, b):
-    return SequenceMatcher(None, a, b).ratio()
+    words_a = a.split()
+    words_b = b.split()
+    matching_words = 0
+
+    for word_a in words_a:
+        for word_b in words_b:
+            if word_a in word_b or word_b in word_a:
+                matching_words += 1
+                break
+
+    similarity = matching_words / min(len(words_a), len(words_b))
+    return similarity
+
 
 def requests_get_with_proxy(url, proxy=None):
 
@@ -85,10 +97,11 @@ def requests_get_with_proxy(url, proxy=None):
     time.sleep(sleep_time)
 
     user_agents = [
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/113.0',
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
-        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
+        # 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/113.0',
+        # 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
+        # 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
+        # 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
         # Add more User-Agent strings as needed
     ]
     headers = {
@@ -96,6 +109,7 @@ def requests_get_with_proxy(url, proxy=None):
         'Referer': 'https://seekingalpha.com/search?q=&tab=headlines'
     }
 
+    # print("Headers:", headers)
     session = requests.Session()
     session.headers.update(headers)
 
@@ -251,44 +265,19 @@ def scrape_seeking_alpha(subject):
 
     # BeautifulSoup method
     soup = BeautifulSoup(response.content, 'html5lib')
-    print("Soup: ", soup)
-    links = [a['href'] for a in soup.select('div.main div.article div a')]
+    # print("Seeking alpha's Soup: ", soup)
+    divs = soup.find_all('div', {'class': 'mt-z V-gQ V-g5 V-hj'})
+    links = []
+    for div in divs:
+        a = div.find('a', {'class': 'mt-X R-dW R-eB R-fg R-fZ V-gT V-g9 V-hj V-hY V-ib V-ip'})
+        link = a.get('href')
+        links = links.append(link)
     print("Found " + str(len(links)) + " links")
 
     for link in links:
-        full_link = "https://seekingalpha.com/" + link
-        print("Link:", full_link)
-
-        response = requests_get_with_proxy(full_link)
-        soup = BeautifulSoup(response.content, 'html.parser')
-
-        news_format = "type_1" # https://www.reuters.com/article/idUSKCN20K2SM
-        # try:
-        headline_element = soup.select_one('h1[data-test-id="post-title"]')
-        headline_text = headline_element.text.strip()
-        print("Headline:", headline_text)
-        # except AttributeError:
-        #     headline_element = soup.select_one('h1[class^="text__text__"]')
-        #     headline_text = headline_element.text.strip()
-        #     print("Headline:", headline_text)
-        #     news_format = "type_2" # https://www.reuters.com/article/idUSKBN2KT0BX
-
-        similarity = similarity_score(subject, headline_text)
-        if similarity > 0.8:
-            # if news_format == "type_1":
-            print("Relevant")
-            paragraph_elements = soup.select('p[class^="Paragraph-paragraph-"]')
-            paragraph_text = ' '.join([p.text.strip() for p in paragraph_elements])
-            print("Text:", paragraph_text)
-            return full_link, subject + ". With full context: " + paragraph_text
-            # elif news_format == "type_2":
-            #     print("Relevant")
-            #     paragraph_elements = soup.select('p[class^="text__text__"]')
-            #     paragraph_text = ' '.join([p.text.strip() for p in paragraph_elements])
-            #     print("Text:", paragraph_text)
-            #     return full_link, subject + ". With full context: " + paragraph_text
-        else:
-            print("Not relevant")
+        url, subject = scrape_seeking_alpha_article_page(link, subject)
+        if url != "N/A":
+            return url, subject
 
     print("Context not found in Seeking Alpha")
     return "N/A", subject
@@ -341,15 +330,15 @@ def scrape_yahoo(subject):
         else:
             print("Not relevant")
 
-    print("Context not found in Seeking Alpha")
+    print("Context not found in Yahoo")
     return "N/A", subject
 
 
-def scrape_google_for_seeking_alpha(subject):
+def scrape_google(subject):
     client = ZenRowsClient("6026db40fdbc3db28235753087be6225f047542f")
     params = {"js_render": "true", "antibot": "true"}
     url_encoded_subject = url_encode_string(subject)
-    full_url = 'https://www.google.com/search?q=' + url_encoded_subject + '+Seeking+Alpha'
+    full_url = 'https://www.google.com/search?q="' + url_encoded_subject + '"+Seeking+Alpha+OR+Reuters'
     print("Trying url " + full_url)
 
     # response = requests_get_with_proxy(full_url)
@@ -358,13 +347,36 @@ def scrape_google_for_seeking_alpha(subject):
     links = []
 
     soup = BeautifulSoup(response.content, 'html5lib')
-    divs = soup.find_all('div', {'class': 'yuRUbf'})
-    for child_div in divs:
-        link_element = child_div.find('a', {'href': lambda href: href and 'seekingalpha' in href})
-        if link_element:
-            link = link_element['href']
-            print("Found 1 link:", link)
-            return scrape_seeking_alpha_article_page(link, subject)
+    father_divs = soup.find_all('div', {'class': 'kvH3mc BToiNc UK95Uc'})
+    for father_div in father_divs:
+        upper_div = father_div.find('div', {'class': 'Z26q7c UK95Uc jGGQ5e'})
+        divs = upper_div.find_all('div', {'class': 'yuRUbf'})
+        for child_div in divs:
+            link_element = child_div.find('a', {'href': lambda href: href and 'seekingalpha' in href})
+            if link_element:
+                link = link_element['href']
+                print("Found 1 Seeking Alpha link:", link)
+                url, subject = scrape_seeking_alpha_article_page(link, subject)
+                if url != "N/A":
+                    return url, subject
+
+            link_element = child_div.find('a', {'href': lambda href: href and 'reuters' in href})
+            if link_element:
+                link = link_element['href']
+                print("Found 1 Reuters link:", link)
+                url, subject = scrape_reuters(subject)
+                if url != "N/A":
+                    return url, subject
+
+
+    # print("Seeking Alpha article not indexed")
+    # if len(links) == 0:
+    #     span = soup.find('span')
+    #     em = span.find('em')
+    #     for div in divs:
+    #         a = div.find('a', {'class': 'mt-X R-dW R-eB R-fg R-fZ V-gT V-g9 V-hj V-hY V-ib V-ip'})
+    #
+    #     print("Found " + str(len(links)) + " links")
 
     print("Link not found")
     return "N/A", subject
@@ -372,12 +384,11 @@ def scrape_google_for_seeking_alpha(subject):
 
 def scrape_seeking_alpha_article_page(url, subject):
     response = requests_get_with_proxy(url)
-    soup = BeautifulSoup(response.content, 'html5lib')
+    soup = BeautifulSoup(response.content, 'lxml-xml')
 
     news_format = "type_1" # https://www.reuters.com/article/idUSKCN20K2SM
     # try:
     title = soup.select('title')
-    print("title:", title)
     headline_text = title[0].text
     print("Headline:", headline_text)
     # except AttributeError:
@@ -403,7 +414,16 @@ def scrape_seeking_alpha_article_page(url, subject):
         #     paragraph_text = ' '.join([p.text.strip() for p in paragraph_elements])
         #     print("Text:", paragraph_text)
         #     return full_link, subject + ". With full context: " + paragraph_text
-    else:
+    else: # https://seekingalpha.com/symbol/PRTYQ/news?page=2
+        # print("Maybe in news summary column?")
+        # divs = soup.find_all('div', {'class': 'sa-IL'})
+        # print("Soup ,", soup)
+        # print("Found divs", divs)
+        # for div in divs:
+        #     h3 = div.find('h3')
+        #     a = h3.find('a')
+        #     if similarity_score(a.text.strip()) > 0.8:
+        #         return scrape_seeking_alpha_article_page(a['href'], subject)
         print("Not relevant")
         return "N/A", subject
 
@@ -441,21 +461,25 @@ def select_column_and_classify():
             output_file_path = os.path.splitext(file_path)[0] + "_classified.csv"
             df.to_csv(output_file_path, index=False)
             gui.msgbox("Classification Complete")
+    except Exception as e:
+        gui.exceptionbox(str(e))
+        print("Error occurred at row index:", row_index)
+        output_file_path = os.path.splitext(file_path)[0] + "_classified.csv"
+        df.to_csv(output_file_path, index=False)
 
+    try:
         # Research contexts for sentences
         context_choice = gui.ynbox("Do you want to research the context for this news?", "Context Research")
         if context_choice:
-            file_path = gui.fileopenbox("Select the CSV file containing news for context research",
-                                       filetypes=["*.csv"])
+            file_path = gui.fileopenbox("Select the CSV file containing news for context research", filetypes=["*.csv"])
             df = pd.read_csv(file_path)
             column_names = df.columns.tolist()
             df["link"] = ""  # Create a new column named "link"
             df["contextualized_sentence"] = ""  # Create a new column named "contextualized sentence"
 
             if file_path:
-                selected_column = gui.buttonbox("Column Selection",
-                                               "Select the column for target sentence in the CSV:",
-                                               choices=column_names)
+                selected_column = gui.buttonbox("Column Selection", "Select the column for target sentence in the CSV:",
+                                                choices=column_names)
                 if not selected_column:
                     raise ValueError("Invalid context selected selection")
                 classification_column = gui.buttonbox("Column Selection",
@@ -464,55 +488,40 @@ def select_column_and_classify():
                 if not classification_column:
                     raise ValueError("Invalid context classification column selection")
 
+                counter = 0  # Counter variable to track the number of rows processed
                 for row_index, row in df.iloc[1:].iterrows():
                     target_sentence = row[selected_column]
                     ticker, remaining_sentence, link = split_sentence(target_sentence)
 
                     if link:
-                        print("Financial statement: ", remaining_sentence, "Link: ", link)
+                        print("Financial statement:", remaining_sentence, "Link:", link)
                     else:
-                        print("Financial statement: ", remaining_sentence)
+                        print("Financial statement:", remaining_sentence)
 
                     # Try all
-                    url, contextualized_sentence = scrape_google_for_seeking_alpha(remaining_sentence)
+                    url, contextualized_sentence = scrape_google(remaining_sentence)
                     if url == "N/A":
                         url, contextualized_sentence = scrape_reuters(remaining_sentence)
                     df.at[row_index, "link"] = url
                     df.at[row_index, "contextualized_sentence"] = contextualized_sentence
 
-                    # Try based on classification alone
-                    # # Perform scraping based on classification_response
-                    # if row[classification_column] == "Twitter":
-                    #     # Perform Twitter scraping
-                    #     df.at[row_index, "link"] = "N/A"  # Put "N/A" under "link"
-                    #     df.at[row_index, "contextualized_sentence"] = remaining_sentence  # Copy "target_sentence"
-                    #
-                    # elif row[classification_column] == "Reuters":
-                    #     # Perform Reuters scraping
-                    #     url, contextualized_sentence = scrape_reuters(remaining_sentence)
-                    #     df.at[row_index, "link"] = url
-                    #     df.at[row_index, "contextualized_sentence"] = contextualized_sentence
-                    # elif row[classification_column] == "WSJ":
-                    #     # Perform WSJ scraping
-                    #     url, contextualized_sentence = scrape_wsj(remaining_sentence)
-                    #     df.at[row_index, "link"] = url
-                    #     df.at[row_index, "contextualized_sentence"] = contextualized_sentence
-                    # elif row[classification_column] == "Seeking Alpha":
-                    #     # Perform Seeking Alpha scraping
-                    #     url, contextualized_sentence = scrape_google_for_seeking_alpha(remaining_sentence)
-                    #     df.at[row_index, "link"] = url
-                    #     df.at[row_index, "contextualized_sentence"] = contextualized_sentence
-                    # else:
-                    #     df.at[row_index, "link"] = "N/A"  # Put "N/A" under "link"
-                    #     df.at[row_index, "contextualized_sentence"] = remaining_sentence  # Copy "target_sentence"
+                    counter += 1
 
-            output_file_path = os.path.splitext(file_path)[0] + "_contextualized.csv"
-            df.to_csv(output_file_path, index=False)
-            gui.msgbox("Scraping Complete")
+                    # Save the DataFrame to a CSV file every 10 rows
+                    if counter % 10 == 0:
+                        output_file_path = os.path.splitext(file_path)[0] + "_scraped.csv"
+                        df.to_csv(output_file_path, index=False)
+                        print("Processed rows:", counter)
+                        print("DataFrame saved to:", output_file_path)
+
+                # Save the final DataFrame to a CSV file
+                output_file_path = os.path.splitext(file_path)[0] + "_scraped.csv"
+                df.to_csv(output_file_path, index=False)
+                gui.msgbox("Scraping Complete")
     except Exception as e:
         gui.exceptionbox(str(e))
         print("Error occurred at row index:", row_index)
-        output_file_path = os.path.splitext(file_path)[0] + "_classified.csv"
+        output_file_path = os.path.splitext(file_path)[0] + "_scraped.csv"
         df.to_csv(output_file_path, index=False)
 
 
