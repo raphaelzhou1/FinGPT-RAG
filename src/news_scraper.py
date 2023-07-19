@@ -124,7 +124,7 @@ def requests_get_with_proxy(url, proxy=None):
         return None
 
 def scraping(link, subject, classification=None):
-    if classification == "seekingalpha" or "seekingalpha" in link:
+    if classification == "Seeking Alpha" or "seekingalpha" in link:
         print("Found 1 Seeking Alpha link:", link)
         if "xml" not in link:
             url, subject = scrape_seeking_alpha_article_page(link, subject)
@@ -145,16 +145,29 @@ def scraping(link, subject, classification=None):
                 url, subject = scrape_seeking_alpha_article_page(link, subject)
                 if url != "N/A":
                     return url, subject
-    elif classification == "reuters" or "reuters" in link:
+    elif classification == "Reuters" or "reuters" in link:
         print("Found 1 Reuters link:", link)
         url, subject = scrape_reuters(subject)
         if url != "N/A":
             return url, subject
-    elif classification == "twitter" or "twitter" in link:
+    elif classification == "Twitter" or "twitter" in link:
         print("Found 1 Twitter link:", link)
         url, subject = scrape_twitter(link, subject)
         if url != "N/A":
             return url, subject
+    elif classification == "Market Screener" or "marketscreener" in link:
+        print("Found 1 Market Screener link:", link)
+        url, subject = scrape_market_screener(link, subject)
+        if url != "N/A":
+            return url, subject
+    elif classification == "Bloomberg" or "bloomberg" in link:
+        print("Found 1 Bloomberg link:", link)
+        url, subject = scrape_bloomberg_article_page(link, subject)
+        if url != "N/A":
+            return url, subject
+
+    print("Unrecognized link type: " + link)
+    return "N/A", subject
 
 
 def scrape_bloomberg(subject):
@@ -176,6 +189,36 @@ def scrape_bloomberg(subject):
         print("Error: " + str(e))
         return []
 
+
+def scrape_bloomberg_article_page(url, subject):
+    response = requests_get_with_proxy(url)
+    soup = BeautifulSoup(response.content, 'html.parser')
+    headline = soup.select_one('h1', {'class': 'HedAndDek_headline-D19MOidHYLI-'}).text.strip()
+
+    bullet_point_texts = ""
+    bullet_points = soup.select('ul', {'class': 'HedAndDek_abstract-XX636-2bHQw-'})
+    if bullet_points:
+        lis = bullet_points.find_all('li')
+        if lis:
+            bullet_point_texts = " ".join([li.text.strip() for li in lis])
+    headline_plus_bullet_points = headline + ". " + bullet_point_texts
+
+    paragraph_texts = ""
+    paragraphs = soup.select_all('p', {'class': 'Paragraph_text-SqIsdNjh0t0-'})
+    for p in paragraphs:
+        if "Sign up" in p.text:
+            continue
+        else:
+            paragraph_texts = " ".join(p.text.strip())
+    headline_plus_bullet_points_plus_paragraphs = headline_plus_bullet_points + ". " + paragraph_texts
+
+    similarity = similarity_score(subject, headline_plus_bullet_points_plus_paragraphs)
+    if similarity > 0.8:
+        print("Found a Bloomberg article with similarity score:", similarity)
+        return url, headline_plus_bullet_points_plus_paragraphs
+    else:
+        print("Not relevant")
+        return "N/A", subject
 
 def scrape_reuters(subject):
     try:
@@ -337,48 +380,6 @@ def scrape_seeking_alpha(subject):
         print("Error in Seeking Alpha:", e)
         return "N/A", subject
 
-def scrape_google(subject):
-    try:
-        client = ZenRowsClient("6026db40fdbc3db28235753087be6225f047542f")
-        params = {"js_render": "true", "antibot": "true"}
-        url_encoded_subject = url_encode_string(subject)
-        # Search Operators https://moz.com/learn/seo/search-operators
-        full_url = 'https://www.google.com/search?q="' + url_encoded_subject + '&as_oq=Twitter+OR+Seeking+Alpha+OR+Reuters'
-        print("Trying url " + full_url)
-
-        # response = requests_get_with_proxy(full_url)
-        response = requests_get_with_proxy(full_url)
-
-        links = []
-
-        soup = BeautifulSoup(response.content, 'html5lib')
-        father_divs = soup.find_all('div', {'class': 'kvH3mc BToiNc UK95Uc'})
-        for father_div in father_divs:
-            upper_div = father_div.find('div', {'class': 'Z26q7c UK95Uc jGGQ5e'})
-            divs = upper_div.find_all('div', {'class': 'yuRUbf'})
-            for child_div in divs:
-                link_element = child_div.find('a', {'href': lambda href: href})
-                if link_element:
-                    link = link_element['href']
-                    return scraping(link, subject)
-
-
-        # print("Seeking Alpha article not indexed")
-        # if len(links) == 0:
-        #     span = soup.find('span')
-        #     em = span.find('em')
-        #     for div in divs:
-        #         a = div.find('a', {'class': 'mt-X R-dW R-eB R-fg R-fZ V-gT V-g9 V-hj V-hY V-ib V-ip'})
-        #
-        #     print("Found " + str(len(links)) + " links")
-
-        print("Link not found")
-        return "N/A", subject
-    except Exception as e:
-        print("Exception in scrape_google:", e)
-        return "N/A", subject
-
-
 def scrape_seeking_alpha_article_page(url, subject):
     try:
         response = requests_get_with_proxy(url)
@@ -427,6 +428,82 @@ def scrape_seeking_alpha_article_page(url, subject):
         print("Exception in scrape_seeking_alpha_article_page:", e)
         return "N/A", subject
 
+def scrape_market_screen_article_page(url, subject):
+    try:
+        response = requests_get_with_proxy(url)
+        soup = BeautifulSoup(response.content, 'lxml-xml')
+
+        headline_text = soup.select('h1', {'class': 'title title__primary mb-15 txt-bold'}).text.strip()
+        print("Headline:", headline_text)
+
+        similarity = similarity_score(subject, headline_text)
+        if similarity > 0.8:
+            print("Relevant")
+
+            context = ""
+            divs = soup.find_all('div', {'class': 'txt-s4 article-text  article-comm'})
+            if divs:
+                for div in divs:
+                    paragraphs = div.find_all('p').text.strip()
+                    if paragraphs:
+                        for paragraph in paragraphs:
+                            bold_paragraph = paragraph.find('strong')
+                            if bold_paragraph:
+                                context += bold_paragraph.text.strip()
+                            else:
+                                context += paragraph.text.strip()
+
+            print("Text:", context)
+            return url, subject + ". With full context: " + context
+        else:
+            print("Not relevant")
+            return "N/A", subject
+    except Exception as e:
+        print("Exception in scrape_seeking_alpha_article_page:", e)
+        return "N/A", subject
+
+def scrape_google(subject):
+    try:
+        client = ZenRowsClient("6026db40fdbc3db28235753087be6225f047542f")
+        params = {"js_render": "true", "antibot": "true"}
+        url_encoded_subject = url_encode_string(subject)
+        # Search Operators https://moz.com/learn/seo/search-operators
+        full_url = 'https://www.google.com/search?q="' + url_encoded_subject + '&as_oq=Twitter+Seeking+Alpha+Reuters+Market+Screener'
+        print("Trying url " + full_url)
+
+        # response = requests_get_with_proxy(full_url)
+        response = requests_get_with_proxy(full_url)
+
+        links = []
+
+        soup = BeautifulSoup(response.content, 'html5lib')
+        father_divs = soup.find_all('div', {'class': 'kvH3mc BToiNc UK95Uc'})
+        for father_div in father_divs:
+            upper_div = father_div.find('div', {'class': 'Z26q7c UK95Uc jGGQ5e'})
+            divs = upper_div.find_all('div', {'class': 'yuRUbf'})
+            for child_div in divs:
+                link_element = child_div.find('a', {'href': lambda href: href})
+                if link_element:
+                    link = link_element['href']
+                    return scraping(link, subject)
+
+
+        # print("Seeking Alpha article not indexed")
+        # if len(links) == 0:
+        #     span = soup.find('span')
+        #     em = span.find('em')
+        #     for div in divs:
+        #         a = div.find('a', {'class': 'mt-X R-dW R-eB R-fg R-fZ V-gT V-g9 V-hj V-hY V-ib V-ip'})
+        #
+        #     print("Found " + str(len(links)) + " links")
+
+        print("Link not found")
+        return "N/A", subject
+    except Exception as e:
+        print("Exception in scrape_google:", e)
+        return "N/A", subject
+
+
 def scrape_twitter(url, subject):
     try:
         response = requests_get_with_proxy(url)
@@ -464,13 +541,13 @@ def scrape_twitter(url, subject):
                 link_domain_div = soup.find('div', {'class': 'css-901oao css-1hf3ou5 r-14j79pv r-37j5jr r-a023e6 r-16dba41 r-rjixqe r-bcqeeo r-qvutc0'}) # domain text
                 if link_domain_div:
                     if "twitter" in link_domain_div:
-                        return scraping(link, subject, classification="twitter")
+                        return scraping(link, subject, classification="Twitter")
                     elif "bloomberg" in link_domain_div:
-                        return scraping(link, subject, classification="bloomberg")
+                        return scraping(link, subject, classification="Bloomberg")
                     elif "reuters" in link_domain_div:
-                        return scraping(link, subject, classification="reuters")
+                        return scraping(link, subject, classification="Reuters")
                     elif "seekingalpha" in link_domain_div:
-                        return scraping(link, subject, classification="seekingalpha")
+                        return scraping(link, subject, classification="Seeking Alpha")
         else:
             print("Not relevant")
             return "N/A", subject
