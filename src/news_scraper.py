@@ -123,6 +123,39 @@ def requests_get_with_proxy(url, proxy=None):
         print("Error: " + str(e))
         return None
 
+def scraping(link, subject, classification=None):
+    if classification == "seekingalpha" or "seekingalpha" in link:
+        print("Found 1 Seeking Alpha link:", link)
+        if "xml" not in link:
+            url, subject = scrape_seeking_alpha_article_page(link, subject)
+            if url != "N/A":
+                return url, subject
+        elif "xml" in link:
+            print(".xml case of Seeking Alpha")
+            response = requests_get_with_proxy(link)
+            soup = BeautifulSoup(response.content, 'lxml-xml')
+            hyphenated_subject = "-".join([word.strip("'\"") for word in subject.split()])
+            print("Hyphenated subject:", hyphenated_subject)
+
+            # Find the first <loc> whose text contains the hyphenated subject
+            loc_element = soup.find('loc', text=lambda text: hyphenated_subject in text)
+            if loc_element:
+                link = loc_element.text
+                print("Found:", link, "from .xml")
+                url, subject = scrape_seeking_alpha_article_page(link, subject)
+                if url != "N/A":
+                    return url, subject
+    elif classification == "reuters" or "reuters" in link:
+        print("Found 1 Reuters link:", link)
+        url, subject = scrape_reuters(subject)
+        if url != "N/A":
+            return url, subject
+    elif classification == "twitter" or "twitter" in link:
+        print("Found 1 Twitter link:", link)
+        url, subject = scrape_twitter(link, subject)
+        if url != "N/A":
+            return url, subject
+
 
 def scrape_bloomberg(subject):
     try:
@@ -327,37 +360,7 @@ def scrape_google(subject):
                 link_element = child_div.find('a', {'href': lambda href: href})
                 if link_element:
                     link = link_element['href']
-                    if "seekingalpha" in link:
-                        print("Found 1 Seeking Alpha link:", link)
-                        if "xml" not in link:
-                            url, subject = scrape_seeking_alpha_article_page(link, subject)
-                            if url != "N/A":
-                                return url, subject
-                        elif "xml" in link:
-                            print(".xml case of Seeking Alpha")
-                            response = requests_get_with_proxy(link)
-                            soup = BeautifulSoup(response.content, 'lxml-xml')
-                            hyphenated_subject = "-".join([word.strip("'\"") for word in subject.split()])
-                            print("Hyphenated subject:", hyphenated_subject)
-
-                            # Find the first <loc> whose text contains the hyphenated subject
-                            loc_element = soup.find('loc', text=lambda text: hyphenated_subject in text)
-                            if loc_element:
-                                link = loc_element.text
-                                print("Found:", link, "from .xml")
-                                url, subject = scrape_seeking_alpha_article_page(link, subject)
-                                if url != "N/A":
-                                    return url, subject
-                    elif "reuters" in link:
-                        print("Found 1 Reuters link:", link)
-                        url, subject = scrape_reuters(subject)
-                        if url != "N/A":
-                            return url, subject
-                    elif "twitter" in link:
-                        print("Found 1 Twitter link:", link)
-                        url, subject = scrape_twitter(link, subject)
-                        if url != "N/A":
-                            return url, subject
+                    return scraping(link, subject)
 
 
         # print("Seeking Alpha article not indexed")
@@ -377,55 +380,103 @@ def scrape_google(subject):
 
 
 def scrape_seeking_alpha_article_page(url, subject):
-    response = requests_get_with_proxy(url)
-    soup = BeautifulSoup(response.content, 'lxml-xml')
+    try:
+        response = requests_get_with_proxy(url)
+        soup = BeautifulSoup(response.content, 'lxml-xml')
 
-    news_format = "type_1" # https://www.reuters.com/article/idUSKCN20K2SM
-    # try:
-    title = soup.select('title')
-    headline_text = title[0].text
-    print("Headline:", headline_text)
-    # except AttributeError:
-    #     headline_element = soup.select_one('h1[class^="text__text__"]')
-    #     headline_text = headline_element.text.strip()
-    #     print("Headline:", headline_text)
-    #     news_format = "type_2" # https://www.reuters.com/article/idUSKBN2KT0BX
+        news_format = "type_1" # https://www.reuters.com/article/idUSKCN20K2SM
+        # try:
+        title = soup.select('title')
+        headline_text = title[0].text
+        print("Headline:", headline_text)
+        # except AttributeError:
+        #     headline_element = soup.select_one('h1[class^="text__text__"]')
+        #     headline_text = headline_element.text.strip()
+        #     print("Headline:", headline_text)
+        #     news_format = "type_2" # https://www.reuters.com/article/idUSKBN2KT0BX
 
-    similarity = similarity_score(subject, headline_text)
-    if similarity > 0.8:
-        # if news_format == "type_1":
-        print("Relevant")
+        similarity = similarity_score(subject, headline_text)
+        if similarity > 0.8:
+            # if news_format == "type_1":
+            print("Relevant")
 
-        div = soup.find('div', {'class': 'lm-ls'})
-        ul = div.find('ul')
-        if ul: # https://seekingalpha.com/news/3540034-dell-hpe-targets-trimmed-on-compute-headwinds
-            lis = ul.find_all('li')
-            paragraph_text = ' '.join([li.text.strip() for li in lis])
-        else: # https://seekingalpha.com/news/3988329-commscope-stock-dips-after-deutsche-bank-cuts-to-hold
-            print("Hidden Seeking Alpha article case")
-            ps = div.find_all('p')
-            paragraph_text = ' '.join([p.text.strip() for p in ps])
-        print("Text:", paragraph_text)
-        return url, subject + ". With full context: " + paragraph_text
-        # elif news_format == "type_2":
-        #     print("Relevant")
-        #     paragraph_elements = soup.select('p[class^="text__text__"]')
-        #     paragraph_text = ' '.join([p.text.strip() for p in paragraph_elements])
-        #     print("Text:", paragraph_text)
-        #     return full_link, subject + ". With full context: " + paragraph_text
-    else: # https://seekingalpha.com/symbol/PRTYQ/news?page=2
-        # print("Maybe in news summary column?")
-        # divs = soup.find_all('div', {'class': 'sa-IL'})
-        # print("Soup ,", soup)
-        # print("Found divs", divs)
-        # for div in divs:
-        #     h3 = div.find('h3')
-        #     a = h3.find('a')
-        #     if similarity_score(a.text.strip()) > 0.8:
-        #         return scrape_seeking_alpha_article_page(a['href'], subject)
-        print("Not relevant")
+            div = soup.find('div', {'class': 'lm-ls'})
+            ul = div.find('ul')
+            if ul: # https://seekingalpha.com/news/3540034-dell-hpe-targets-trimmed-on-compute-headwinds
+                lis = ul.find_all('li')
+                paragraph_text = ' '.join([li.text.strip() for li in lis])
+            else: # https://seekingalpha.com/news/3988329-commscope-stock-dips-after-deutsche-bank-cuts-to-hold
+                print("Hidden Seeking Alpha article case")
+                ps = div.find_all('p')
+                paragraph_text = ' '.join([p.text.strip() for p in ps])
+            print("Text:", paragraph_text)
+            return url, subject + ". With full context: " + paragraph_text
+        else: # https://seekingalpha.com/symbol/PRTYQ/news?page=2
+            # print("Maybe in news summary column?")
+            # divs = soup.find_all('div', {'class': 'sa-IL'})
+            # print("Soup ,", soup)
+            # print("Found divs", divs)
+            # for div in divs:
+            #     h3 = div.find('h3')
+            #     a = h3.find('a')
+            #     if similarity_score(a.text.strip()) > 0.8:
+            #         return scrape_seeking_alpha_article_page(a['href'], subject)
+            print("Not relevant")
+            return "N/A", subject
+    except Exception as e:
+        print("Exception in scrape_seeking_alpha_article_page:", e)
         return "N/A", subject
 
+def scrape_twitter(url, subject):
+    try:
+        response = requests_get_with_proxy(url)
+        soup = BeautifulSoup(response.content, 'lxml-xml')
+
+        news_format = "type_1" # https://www.reuters.com/article/idUSKCN20K2SM
+        twitter_post_div = soup.select('div', {'class': 'css-901oao r-18jsvk2 r-37j5jr r-1inkyih r-16dba41 r-135wba7 r-bcqeeo r-bnwqim r-qvutc0'})
+        twitter_post_spans = twitter_post_div.find_all('span')
+        twitter_post_text = ""
+        for twitter_post_span in twitter_post_spans:
+            twitter_texts = twitter_post_span.find_all('span')
+            for twitter_text in twitter_texts:
+                twitter_post_text += twitter_text.text
+        print("Twitter text:", twitter_post_text)
+
+        similarity = similarity_score(subject, twitter_post_text)
+        if similarity > 0.8:
+            print("Relevant")
+
+            if len(twitter_post_text) - len(subject) > 5: # additional context:
+                return url, subject + ". With full context: " + twitter_post_text
+            else: # case of twitter post interpreting a link
+                print("Twitter post interpreting a link")
+                # Case 1
+                for twitter_post_span in twitter_post_spans: # case of link embedded in twitter post
+                    as_maybe_containing_link = twitter_post_span.find_all('a')
+                    for a_maybe_containing_link in as_maybe_containing_link:
+                        link = a_maybe_containing_link['href']
+                        if link:
+                            print("Link found in Twitter post text")
+                            return scraping(link, subject)
+
+                # Case 2
+                link = soup.find('a', {'class': 'css-4rbku5 css-18t94o4 css-1dbjc4n r-1loqt21 r-18u37iz r-16y2uox r-1wtj0ep r-1ny4l3l r-o7ynqc r-6416eg'})['href']
+                link_domain_div = soup.find('div', {'class': 'css-901oao css-1hf3ou5 r-14j79pv r-37j5jr r-a023e6 r-16dba41 r-rjixqe r-bcqeeo r-qvutc0'}) # domain text
+                if link_domain_div:
+                    if "twitter" in link_domain_div:
+                        return scraping(link, subject, classification="twitter")
+                    elif "bloomberg" in link_domain_div:
+                        return scraping(link, subject, classification="bloomberg")
+                    elif "reuters" in link_domain_div:
+                        return scraping(link, subject, classification="reuters")
+                    elif "seekingalpha" in link_domain_div:
+                        return scraping(link, subject, classification="seekingalpha")
+        else:
+            print("Not relevant")
+            return "N/A", subject
+    except Exception as e:
+        print("Exception in scrape_seeking_alpha_article_page:", e)
+        return "N/A", subject
 
 def scrape_yahoo(subject):
     try:
