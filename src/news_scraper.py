@@ -3,6 +3,7 @@ import random
 import time
 import json
 import html_to_json
+import multiprocessing
 import urllib.parse
 from dotenv import load_dotenv
 import pandas as pd
@@ -35,6 +36,9 @@ def split_sentence(sentence):
             if 'http' in word:
                 url.append(word)
                 remaining_sentence = remaining_sentence.replace(word, '').strip()
+
+    # Delete "- " and leading/trailing spaces
+    remaining_sentence = remaining_sentence.replace("- ", "").strip()
 
     return ticker, remaining_sentence, url
 
@@ -92,294 +96,334 @@ def similarity_score(a, b):
 
 
 def requests_get_with_proxy(url, proxy=None):
+    try:
+        sleep_time = random.randint(1, 5)
+        time.sleep(sleep_time)
 
-    sleep_time = random.randint(1, 5)
-    time.sleep(sleep_time)
+        user_agents = [
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
+            # 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/113.0',
+            # 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
+            # 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
+            # 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
+            # Add more User-Agent strings as needed
+        ]
+        headers = {
+            'User-Agent': random.choice(user_agents),
+            'Referer': 'https://seekingalpha.com/search?q=&tab=headlines'
+        }
 
-    user_agents = [
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
-        # 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/113.0',
-        # 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
-        # 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
-        # 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
-        # Add more User-Agent strings as needed
-    ]
-    headers = {
-        'User-Agent': random.choice(user_agents),
-        'Referer': 'https://seekingalpha.com/search?q=&tab=headlines'
-    }
+        # print("Headers:", headers)
+        session = requests.Session()
+        session.headers.update(headers)
 
-    # print("Headers:", headers)
-    session = requests.Session()
-    session.headers.update(headers)
-
-    response = session.get(url, proxies=proxy)
-    return response
+        response = session.get(url, proxies=proxy)
+        return response
+    except Exception as e:
+        print("Error: " + str(e))
+        return None
 
 
 def scrape_bloomberg(subject):
-    client = ZenRowsClient("6026db40fdbc3db28235753087be6225f047542f")
-    params = {"premium_proxy": "true", "proxy_country": "us"}
-    url_encoded_subject = url_encode_string(subject)
+    try:
+        client = ZenRowsClient("6026db40fdbc3db28235753087be6225f047542f")
+        params = {"premium_proxy": "true", "proxy_country": "us"}
+        url_encoded_subject = url_encode_string(subject)
 
-    full_url = 'https://www.bloomberg.com/search?query=' + url_encoded_subject + '&sort=relevance:asc&startTime=2015-04-01T01:01:01.001Z&' + '&page=' + str(
-        1)
-    print("Trying url " + full_url)
-    response = requests_get_with_proxy(full_url)
-    print("Response code: " + str(response.status_code))
-    soup = BeautifulSoup(response.content, 'html.parser')
-    links = [a['href'] for a in soup.select('a[class^="headline_"]') if 'href' in a.attrs]
-    print("Found " + str(len(links)) + " links", "these are: " + str(links))
-    return links
-
+        full_url = 'https://www.bloomberg.com/search?query=' + url_encoded_subject + '&sort=relevance:asc&startTime=2015-04-01T01:01:01.001Z&' + '&page=' + str(
+            1)
+        print("Trying url " + full_url)
+        response = requests_get_with_proxy(full_url)
+        print("Response code: " + str(response.status_code))
+        soup = BeautifulSoup(response.content, 'html.parser')
+        links = [a['href'] for a in soup.select('a[class^="headline_"]') if 'href' in a.attrs]
+        print("Found " + str(len(links)) + " links", "these are: " + str(links))
+        return links
+    except Exception as e:
+        print("Error: " + str(e))
+        return []
 
 
 def scrape_reuters(subject):
-    client = ZenRowsClient("6026db40fdbc3db28235753087be6225f047542f")
-    params = {"premium_proxy": "true", "proxy_country": "us"}
-    url_encoded_subject = url_encode_string(subject)
+    try:
+        client = ZenRowsClient("6026db40fdbc3db28235753087be6225f047542f")
+        params = {"premium_proxy": "true", "proxy_country": "us"}
+        url_encoded_subject = url_encode_string(subject)
 
-    full_url = 'https://www.reuters.com/search/news?blob=' + url_encoded_subject
-    print("Trying url " + full_url)
-    response = requests_get_with_proxy(full_url)
-    soup = BeautifulSoup(response.content, 'html.parser')
-    link_elements = soup.select('h3.search-result-title > a')
-    links = [link['href'] for link in link_elements]
-    print("Found " + str(len(links)))
-
-    for link in links:
-        full_link = "https://www.reuters.com" + link
-        print("Link:", full_link)
-
-        response = requests_get_with_proxy(full_link)
+        full_url = 'https://www.reuters.com/search/news?blob=' + url_encoded_subject
+        print("Trying url " + full_url)
+        response = requests_get_with_proxy(full_url)
         soup = BeautifulSoup(response.content, 'html.parser')
+        link_elements = soup.select('h3.search-result-title > a')
+        links = [link['href'] for link in link_elements]
+        print("Found " + str(len(links)))
 
-        news_format = "type_1" # https://www.reuters.com/article/idUSKCN20K2SM
-        try:
-            headline_element = soup.select_one('h1[class^="Headline-headline-"]')
+        for link in links:
+            full_link = "https://www.reuters.com" + link
+            print("Link:", full_link)
+
+            response = requests_get_with_proxy(full_link)
+            soup = BeautifulSoup(response.content, 'html.parser')
+
+            news_format = "type_1" # https://www.reuters.com/article/idUSKCN20K2SM
+            try:
+                headline_element = soup.select_one('h1[class^="Headline-headline-"]')
+                headline_text = headline_element.text.strip()
+                print("Headline:", headline_text)
+            except AttributeError:
+                headline_element = soup.select_one('h1[class^="text__text__"]')
+                headline_text = headline_element.text.strip()
+                print("Headline:", headline_text)
+                news_format = "type_2" # https://www.reuters.com/article/idUSKBN2KT0BX
+
+            similarity = similarity_score(subject, headline_text)
+            if similarity > 0.8:
+                if news_format == "type_1":
+                    print("Relevant")
+                    paragraph_elements = soup.select('p[class^="Paragraph-paragraph-"]')
+                    paragraph_text = ' '.join([p.text.strip() for p in paragraph_elements])
+                    print("Text:", paragraph_text)
+                    return full_link, subject + ". With full context: " + paragraph_text
+                elif news_format == "type_2":
+                    print("Relevant")
+                    paragraph_elements = soup.select('p[class^="text__text__"]')
+                    paragraph_text = ' '.join([p.text.strip() for p in paragraph_elements])
+                    print("Text:", paragraph_text)
+                    return full_link, subject + ". With full context: " + paragraph_text
+            else:
+                print("Not relevant")
+
+        print("Context not found in Reuters")
+        return "N/A", subject
+    except Exception as e:
+        print("Error in Reuters:", e)
+        return "N/A", subject
+
+def scrape_wsj(subject):
+    try:
+        client = ZenRowsClient("6026db40fdbc3db28235753087be6225f047542f")
+        params = {"premium_proxy": "true", "proxy_country": "us"}
+        url_encoded_subject = url_encode_string(subject)
+
+        full_url = 'https://www.wsj.com/search?query=' + url_encoded_subject + '&operator=OR&sort=relevance&duration=1y&startDate=2015%2F01%2F01&endDate=2016%2F01%2F01'
+        print("Trying url " + full_url)
+        response = requests_get_with_proxy(full_url)
+        soup = BeautifulSoup(response.content, 'html.parser')
+        link_elements = soup.select('h3[class^="WSJTheme--headline"] a')
+        links = [link['href'] for link in link_elements]
+        print("Found " + str(len(links)))
+
+        for link in links:
+            full_link = link
+            print("Link:", full_link)
+
+            response = requests_get_with_proxy(full_link)
+            soup = BeautifulSoup(response.content, 'html.parser')
+
+            news_format = "type_1" # https://www.reuters.com/article/idUSKCN20K2SM
+            # try:
+            headline_element = soup.select_one('h1[class*="StyledHeadline"]')
             headline_text = headline_element.text.strip()
             print("Headline:", headline_text)
-        except AttributeError:
-            headline_element = soup.select_one('h1[class^="text__text__"]')
-            headline_text = headline_element.text.strip()
-            print("Headline:", headline_text)
-            news_format = "type_2" # https://www.reuters.com/article/idUSKBN2KT0BX
+            # except AttributeError:
+            #     headline_element = soup.select_one('h1[class^="text__text__"]')
+            #     headline_text = headline_element.text.strip()
+            #     print("Headline:", headline_text)
+            #     news_format = "type_2" # https://www.reuters.com/article/idUSKBN2KT0BX
 
-        similarity = similarity_score(subject, headline_text)
-        if similarity > 0.8:
-            if news_format == "type_1":
+            similarity = similarity_score(subject, headline_text)
+            if similarity > 0.8:
+                # if news_format == "type_1":
                 print("Relevant")
                 paragraph_elements = soup.select('p[class^="Paragraph-paragraph-"]')
                 paragraph_text = ' '.join([p.text.strip() for p in paragraph_elements])
                 print("Text:", paragraph_text)
                 return full_link, subject + ". With full context: " + paragraph_text
-            elif news_format == "type_2":
+                # elif news_format == "type_2":
+                #     print("Relevant")
+                #     paragraph_elements = soup.select('p[class^="text__text__"]')
+                #     paragraph_text = ' '.join([p.text.strip() for p in paragraph_elements])
+                #     print("Text:", paragraph_text)
+                #     return full_link, subject + ". With full context: " + paragraph_text
+            else:
+                print("Not relevant")
+
+        print("Context not found in WSJ")
+        return "N/A", subject
+    except Exception as e:
+        print("Error in WSJ:", e)
+        return "N/A", subject
+
+def scrape_seeking_alpha(subject):
+    try:
+        client = ZenRowsClient("6026db40fdbc3db28235753087be6225f047542f")
+        params = {"js_render": "true", "antibot": "true"}
+        url_encoded_subject = url_encode_string(subject)
+        full_url = 'https://seekingalpha.com/search?q=' + url_encoded_subject + '&tab=headlines'
+        print("Trying url " + full_url)
+
+        # response = requests_get_with_proxy(full_url)
+        response = client.get(full_url, params=params)
+
+        # JSONN parsing method
+        # json_response = html_to_json.convert(response.content)
+        # print("Response: ", response.content)
+        # print("JSON: ", json_response)
+        # response_json = json.loads(json_response)
+        # Find all the <a> tags within the specified hierarchy
+        # links = []
+        #
+        # div_main = response_json['div.main']
+        # if div_main:
+        #     div_article = div_main['div.article']
+        #     if div_article:
+        #         divs = div_article['div']
+        #         for div in divs:
+        #             if 'a' in div:
+        #                 links.append(div['a']['href'])
+
+        # BeautifulSoup method
+        soup = BeautifulSoup(response.content, 'html5lib')
+        # print("Seeking alpha's Soup: ", soup)
+        divs = soup.find_all('div', {'class': 'mt-z V-gQ V-g5 V-hj'})
+        links = []
+        for div in divs:
+            a = div.find('a', {'class': 'mt-X R-dW R-eB R-fg R-fZ V-gT V-g9 V-hj V-hY V-ib V-ip'})
+            link = a.get('href')
+            links = links.append(link)
+        print("Found " + str(len(links)) + " links")
+
+        for link in links:
+            url, subject = scrape_seeking_alpha_article_page(link, subject)
+            if url != "N/A":
+                return url, subject
+
+        print("Context not found in Seeking Alpha")
+        return "N/A", subject
+    except Exception as e:
+        print("Error in Seeking Alpha:", e)
+        return "N/A", subject
+
+def scrape_yahoo(subject):
+    try:
+        client = ZenRowsClient("6026db40fdbc3db28235753087be6225f047542f")
+        params = {"premium_proxy": "true", "proxy_country": "us"}
+        url_encoded_subject = url_encode_string(subject)
+
+        full_url = 'https://seekingalpha.com/search?q=' + url_encoded_subject + '&tab=headlines'
+        print("Trying url " + full_url)
+        response = requests_get_with_proxy(full_url)
+        soup = BeautifulSoup(response.content, 'html.parser')
+        link_elements = soup.select('a[data-test-id="post-list-item-title"]')
+        links = [link['href'] for link in link_elements]
+        print("Found " + str(len(links)))
+
+        for link in links:
+            full_link = "https://seekingalpha.com/" + link
+            print("Link:", full_link)
+
+            response = requests_get_with_proxy(full_link)
+            soup = BeautifulSoup(response.content, 'html.parser')
+
+            news_format = "type_1" # https://www.reuters.com/article/idUSKCN20K2SM
+            # try:
+            headline_element = soup.select_one('h1[data-test-id="post-title"]')
+            headline_text = headline_element.text.strip()
+            print("Headline:", headline_text)
+            # except AttributeError:
+            #     headline_element = soup.select_one('h1[class^="text__text__"]')
+            #     headline_text = headline_element.text.strip()
+            #     print("Headline:", headline_text)
+            #     news_format = "type_2" # https://www.reuters.com/article/idUSKBN2KT0BX
+
+            similarity = similarity_score(subject, headline_text)
+            if similarity > 0.8:
+                # if news_format == "type_1":
                 print("Relevant")
-                paragraph_elements = soup.select('p[class^="text__text__"]')
+                paragraph_elements = soup.select('p[class^="Paragraph-paragraph-"]')
                 paragraph_text = ' '.join([p.text.strip() for p in paragraph_elements])
                 print("Text:", paragraph_text)
                 return full_link, subject + ". With full context: " + paragraph_text
-        else:
-            print("Not relevant")
+                # elif news_format == "type_2":
+                #     print("Relevant")
+                #     paragraph_elements = soup.select('p[class^="text__text__"]')
+                #     paragraph_text = ' '.join([p.text.strip() for p in paragraph_elements])
+                #     print("Text:", paragraph_text)
+                #     return full_link, subject + ". With full context: " + paragraph_text
+            else:
+                print("Not relevant")
 
-    print("Context not found in Reuters")
-    return "N/A", subject
-
-def scrape_wsj(subject):
-    client = ZenRowsClient("6026db40fdbc3db28235753087be6225f047542f")
-    params = {"premium_proxy": "true", "proxy_country": "us"}
-    url_encoded_subject = url_encode_string(subject)
-
-    full_url = 'https://www.wsj.com/search?query=' + url_encoded_subject + '&operator=OR&sort=relevance&duration=1y&startDate=2015%2F01%2F01&endDate=2016%2F01%2F01'
-    print("Trying url " + full_url)
-    response = requests_get_with_proxy(full_url)
-    soup = BeautifulSoup(response.content, 'html.parser')
-    link_elements = soup.select('h3[class^="WSJTheme--headline"] a')
-    links = [link['href'] for link in link_elements]
-    print("Found " + str(len(links)))
-
-    for link in links:
-        full_link = link
-        print("Link:", full_link)
-
-        response = requests_get_with_proxy(full_link)
-        soup = BeautifulSoup(response.content, 'html.parser')
-
-        news_format = "type_1" # https://www.reuters.com/article/idUSKCN20K2SM
-        # try:
-        headline_element = soup.select_one('h1[class*="StyledHeadline"]')
-        headline_text = headline_element.text.strip()
-        print("Headline:", headline_text)
-        # except AttributeError:
-        #     headline_element = soup.select_one('h1[class^="text__text__"]')
-        #     headline_text = headline_element.text.strip()
-        #     print("Headline:", headline_text)
-        #     news_format = "type_2" # https://www.reuters.com/article/idUSKBN2KT0BX
-
-        similarity = similarity_score(subject, headline_text)
-        if similarity > 0.8:
-            # if news_format == "type_1":
-            print("Relevant")
-            paragraph_elements = soup.select('p[class^="Paragraph-paragraph-"]')
-            paragraph_text = ' '.join([p.text.strip() for p in paragraph_elements])
-            print("Text:", paragraph_text)
-            return full_link, subject + ". With full context: " + paragraph_text
-            # elif news_format == "type_2":
-            #     print("Relevant")
-            #     paragraph_elements = soup.select('p[class^="text__text__"]')
-            #     paragraph_text = ' '.join([p.text.strip() for p in paragraph_elements])
-            #     print("Text:", paragraph_text)
-            #     return full_link, subject + ". With full context: " + paragraph_text
-        else:
-            print("Not relevant")
-
-    print("Context not found in WSJ")
-    return "N/A", subject
-
-def scrape_seeking_alpha(subject):
-    client = ZenRowsClient("6026db40fdbc3db28235753087be6225f047542f")
-    params = {"js_render": "true", "antibot": "true"}
-    url_encoded_subject = url_encode_string(subject)
-    full_url = 'https://seekingalpha.com/search?q=' + url_encoded_subject + '&tab=headlines'
-    print("Trying url " + full_url)
-
-    # response = requests_get_with_proxy(full_url)
-    response = client.get(full_url, params=params)
-
-    # JSONN parsing method
-    # json_response = html_to_json.convert(response.content)
-    # print("Response: ", response.content)
-    # print("JSON: ", json_response)
-    # response_json = json.loads(json_response)
-    # Find all the <a> tags within the specified hierarchy
-    # links = []
-    #
-    # div_main = response_json['div.main']
-    # if div_main:
-    #     div_article = div_main['div.article']
-    #     if div_article:
-    #         divs = div_article['div']
-    #         for div in divs:
-    #             if 'a' in div:
-    #                 links.append(div['a']['href'])
-
-    # BeautifulSoup method
-    soup = BeautifulSoup(response.content, 'html5lib')
-    # print("Seeking alpha's Soup: ", soup)
-    divs = soup.find_all('div', {'class': 'mt-z V-gQ V-g5 V-hj'})
-    links = []
-    for div in divs:
-        a = div.find('a', {'class': 'mt-X R-dW R-eB R-fg R-fZ V-gT V-g9 V-hj V-hY V-ib V-ip'})
-        link = a.get('href')
-        links = links.append(link)
-    print("Found " + str(len(links)) + " links")
-
-    for link in links:
-        url, subject = scrape_seeking_alpha_article_page(link, subject)
-        if url != "N/A":
-            return url, subject
-
-    print("Context not found in Seeking Alpha")
-    return "N/A", subject
-
-def scrape_yahoo(subject):
-    client = ZenRowsClient("6026db40fdbc3db28235753087be6225f047542f")
-    params = {"premium_proxy": "true", "proxy_country": "us"}
-    url_encoded_subject = url_encode_string(subject)
-
-    full_url = 'https://seekingalpha.com/search?q=' + url_encoded_subject + '&tab=headlines'
-    print("Trying url " + full_url)
-    response = requests_get_with_proxy(full_url)
-    soup = BeautifulSoup(response.content, 'html.parser')
-    link_elements = soup.select('a[data-test-id="post-list-item-title"]')
-    links = [link['href'] for link in link_elements]
-    print("Found " + str(len(links)))
-
-    for link in links:
-        full_link = "https://seekingalpha.com/" + link
-        print("Link:", full_link)
-
-        response = requests_get_with_proxy(full_link)
-        soup = BeautifulSoup(response.content, 'html.parser')
-
-        news_format = "type_1" # https://www.reuters.com/article/idUSKCN20K2SM
-        # try:
-        headline_element = soup.select_one('h1[data-test-id="post-title"]')
-        headline_text = headline_element.text.strip()
-        print("Headline:", headline_text)
-        # except AttributeError:
-        #     headline_element = soup.select_one('h1[class^="text__text__"]')
-        #     headline_text = headline_element.text.strip()
-        #     print("Headline:", headline_text)
-        #     news_format = "type_2" # https://www.reuters.com/article/idUSKBN2KT0BX
-
-        similarity = similarity_score(subject, headline_text)
-        if similarity > 0.8:
-            # if news_format == "type_1":
-            print("Relevant")
-            paragraph_elements = soup.select('p[class^="Paragraph-paragraph-"]')
-            paragraph_text = ' '.join([p.text.strip() for p in paragraph_elements])
-            print("Text:", paragraph_text)
-            return full_link, subject + ". With full context: " + paragraph_text
-            # elif news_format == "type_2":
-            #     print("Relevant")
-            #     paragraph_elements = soup.select('p[class^="text__text__"]')
-            #     paragraph_text = ' '.join([p.text.strip() for p in paragraph_elements])
-            #     print("Text:", paragraph_text)
-            #     return full_link, subject + ". With full context: " + paragraph_text
-        else:
-            print("Not relevant")
-
-    print("Context not found in Yahoo")
-    return "N/A", subject
-
+        print("Context not found in Yahoo")
+        return "N/A", subject
+    except Exception as e:
+        print("Error in Yahoo:", e)
+        return "N/A", subject
 
 def scrape_google(subject):
-    client = ZenRowsClient("6026db40fdbc3db28235753087be6225f047542f")
-    params = {"js_render": "true", "antibot": "true"}
-    url_encoded_subject = url_encode_string(subject)
-    full_url = 'https://www.google.com/search?q="' + url_encoded_subject + '"+Seeking+Alpha+OR+Reuters'
-    print("Trying url " + full_url)
+    try:
+        client = ZenRowsClient("6026db40fdbc3db28235753087be6225f047542f")
+        params = {"js_render": "true", "antibot": "true"}
+        url_encoded_subject = url_encode_string(subject)
+        full_url = 'https://www.google.com/search?q="' + url_encoded_subject + '"+Seeking+Alpha+OR+Reuters'
+        print("Trying url " + full_url)
 
-    # response = requests_get_with_proxy(full_url)
-    response = requests_get_with_proxy(full_url)
+        # response = requests_get_with_proxy(full_url)
+        response = requests_get_with_proxy(full_url)
 
-    links = []
+        links = []
 
-    soup = BeautifulSoup(response.content, 'html5lib')
-    father_divs = soup.find_all('div', {'class': 'kvH3mc BToiNc UK95Uc'})
-    for father_div in father_divs:
-        upper_div = father_div.find('div', {'class': 'Z26q7c UK95Uc jGGQ5e'})
-        divs = upper_div.find_all('div', {'class': 'yuRUbf'})
-        for child_div in divs:
-            link_element = child_div.find('a', {'href': lambda href: href and 'seekingalpha' in href})
-            if link_element:
-                link = link_element['href']
-                print("Found 1 Seeking Alpha link:", link)
-                url, subject = scrape_seeking_alpha_article_page(link, subject)
-                if url != "N/A":
-                    return url, subject
+        soup = BeautifulSoup(response.content, 'html5lib')
+        father_divs = soup.find_all('div', {'class': 'kvH3mc BToiNc UK95Uc'})
+        for father_div in father_divs:
+            upper_div = father_div.find('div', {'class': 'Z26q7c UK95Uc jGGQ5e'})
+            divs = upper_div.find_all('div', {'class': 'yuRUbf'})
+            for child_div in divs:
+                link_element = child_div.find('a', {'href': lambda href: href})
+                if link_element:
+                    link = link_element['href']
+                    if "seekingalpha" in link:
+                        print("Found 1 Seeking Alpha link:", link)
+                        if "xml" not in link:
+                            url, subject = scrape_seeking_alpha_article_page(link, subject)
+                            if url != "N/A":
+                                return url, subject
+                        elif "xml" in link:
+                            print(".xml case of Seeking Alpha")
+                            response = requests_get_with_proxy(link)
+                            soup = BeautifulSoup(response.content, 'lxml-xml')
+                            hyphenated_subject = "-".join([word.strip("'\"") for word in subject.split()])
+                            print("Hyphenated subject:", hyphenated_subject)
 
-            link_element = child_div.find('a', {'href': lambda href: href and 'reuters' in href})
-            if link_element:
-                link = link_element['href']
-                print("Found 1 Reuters link:", link)
-                url, subject = scrape_reuters(subject)
-                if url != "N/A":
-                    return url, subject
+                            # Find the first <loc> whose text contains the hyphenated subject
+                            loc_element = soup.find('loc', text=lambda text: hyphenated_subject in text)
+                            if loc_element:
+                                link = loc_element.text
+                                print("Found:", link, "from .xml")
+                                url, subject = scrape_seeking_alpha_article_page(link, subject)
+                                if url != "N/A":
+                                    return url, subject
+                    elif "reuters" in link:
+                        link = link_element['href']
+                        print("Found 1 Reuters link:", link)
+                        url, subject = scrape_reuters(subject)
+                        if url != "N/A":
+                            return url, subject
 
 
-    # print("Seeking Alpha article not indexed")
-    # if len(links) == 0:
-    #     span = soup.find('span')
-    #     em = span.find('em')
-    #     for div in divs:
-    #         a = div.find('a', {'class': 'mt-X R-dW R-eB R-fg R-fZ V-gT V-g9 V-hj V-hY V-ib V-ip'})
-    #
-    #     print("Found " + str(len(links)) + " links")
+        # print("Seeking Alpha article not indexed")
+        # if len(links) == 0:
+        #     span = soup.find('span')
+        #     em = span.find('em')
+        #     for div in divs:
+        #         a = div.find('a', {'class': 'mt-X R-dW R-eB R-fg R-fZ V-gT V-g9 V-hj V-hY V-ib V-ip'})
+        #
+        #     print("Found " + str(len(links)) + " links")
 
-    print("Link not found")
-    return "N/A", subject
+        print("Link not found")
+        return "N/A", subject
+    except Exception as e:
+        print("Exception in scrape_google:", e)
+        return "N/A", subject
 
 
 def scrape_seeking_alpha_article_page(url, subject):
@@ -404,8 +448,13 @@ def scrape_seeking_alpha_article_page(url, subject):
 
         div = soup.find('div', {'class': 'lm-ls'})
         ul = div.find('ul')
-        lis = ul.find_all('li')
-        paragraph_text = ' '.join([li.text.strip() for li in lis])
+        if ul: # https://seekingalpha.com/news/3540034-dell-hpe-targets-trimmed-on-compute-headwinds
+            lis = ul.find_all('li')
+            paragraph_text = ' '.join([li.text.strip() for li in lis])
+        else: # https://seekingalpha.com/news/3988329-commscope-stock-dips-after-deutsche-bank-cuts-to-hold
+            print("Hidden Seeking Alpha article case")
+            ps = div.find_all('p')
+            paragraph_text = ' '.join([p.text.strip() for p in ps])
         print("Text:", paragraph_text)
         return url, subject + ". With full context: " + paragraph_text
         # elif news_format == "type_2":
@@ -426,6 +475,7 @@ def scrape_seeking_alpha_article_page(url, subject):
         #         return scrape_seeking_alpha_article_page(a['href'], subject)
         print("Not relevant")
         return "N/A", subject
+
 
 # Function that handles classification of sentences using OpenAI and scraping of news websites
 def select_column_and_classify():
@@ -524,10 +574,26 @@ def select_column_and_classify():
         output_file_path = os.path.splitext(file_path)[0] + "_scraped.csv"
         df.to_csv(output_file_path, index=False)
 
+def process_row(row_index, row, selected_column):
+    # Process each row here
 
-def browse_csv_file():
-    select_column_and_classify()
+    target_sentence = row[selected_column]
+    ticker, remaining_sentence, link = split_sentence(target_sentence)
+
+    if link:
+        print("Financial statement:", remaining_sentence, "Link:", link)
+    else:
+        print("Financial statement:", remaining_sentence)
+
+    # Try all
+    url, contextualized_sentence = scrape_google(remaining_sentence)
+    if url == "N/A":
+        url, contextualized_sentence = scrape_reuters(remaining_sentence)
+    df.at[row_index, "link"] = url
+    df.at[row_index, "contextualized_sentence"] = contextualized_sentence
+
+    return row_index, row
 
 
 if __name__ == '__main__':
-    browse_csv_file()
+    select_column_and_classify()
