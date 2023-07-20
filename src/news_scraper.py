@@ -38,7 +38,7 @@ def split_sentence(sentence):
                 remaining_sentence = remaining_sentence.replace(word, '').strip()
 
     # Delete "- " and leading/trailing spaces
-    remaining_sentence = remaining_sentence.replace("- ", "").replace(" ", "").replace("\n", "").strip()
+    remaining_sentence = remaining_sentence.replace("- ", "").replace("\n", "").strip()
 
     return ticker, remaining_sentence, url
 
@@ -610,10 +610,11 @@ def scrape_yahoo(subject):
         return "N/A", subject
 
 
+
 # Function that handles classification of sentences using OpenAI and scraping of news websites
 def select_column_and_classify():
+    # Classify sentences
     try:
-        # Classify sentences
         classification_choice = gui.ynbox("Do you want to classify the news?", "Classification")
 
         if classification_choice:
@@ -650,8 +651,8 @@ def select_column_and_classify():
         output_file_path = os.path.splitext(file_path)[0] + "_classified.csv"
         df.to_csv(output_file_path, index=False)
 
+    # Research contexts for sentences
     try:
-        # Research contexts for sentences
         context_choice = gui.ynbox("Do you want to research the context for this news?", "Context Research")
         if context_choice:
             file_path = gui.fileopenbox("Select the CSV file containing news for context research", filetypes=["*.csv"])
@@ -682,9 +683,10 @@ def select_column_and_classify():
                         print("Financial statement:", remaining_sentence)
 
                     # Try all
-                    url, contextualized_sentence = scrape_google(remaining_sentence)
-                    if url == "N/A":
-                        url, contextualized_sentence = scrape_reuters(remaining_sentence)
+                    # url, contextualized_sentence = scrape_google(remaining_sentence)
+                    # if url == "N/A":
+                    #     url, contextualized_sentence = scrape_reuters(remaining_sentence)
+                    url, contextualized_sentence = scrape_seeking_alpha(remaining_sentence)
                     df.at[row_index, "link"] = url
                     df.at[row_index, "contextualized_sentence"] = contextualized_sentence
 
