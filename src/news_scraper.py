@@ -338,7 +338,6 @@ def scrape_seeking_alpha(subject):
         full_url = 'https://seekingalpha.com/search?q=' + url_encoded_subject + '&tab=headlines'
         print("Trying url " + full_url)
 
-        # response = requests_get_with_proxy(full_url)
         response = client.get(full_url, params=params)
 
         # JSONN parsing method
