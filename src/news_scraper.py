@@ -171,11 +171,9 @@ def requests_get_for_seeking_alpha(url, subject):
     return "N/A", subject
 
 def scraping(link, subject):
-    classification = None
 
     if "seekingalpha" in link:
         print("Found 1 Seeking Alpha link:", link)
-        classification = "Seeking Alpha"
         requests_get_for_seeking_alpha(link, subject)
         if "xml" not in link:
             print("Non-.xml case of Seeking Alpha")
@@ -200,35 +198,29 @@ def scraping(link, subject):
             print("Didn't find from .xml")
     elif "reuters" in link:
         print("Found 1 Reuters link:", link)
-        classification = "Reuters"
         url, subject = scrape_reuters(subject)
         if url != "N/A":
             return url, subject
     elif "twitter" in link:
         print("Found 1 Twitter link:", link)
-        classification = "Twitter"
         url, subject = scrape_twitter(link, subject)
         if url != "N/A":
             return url, subject
     elif "marketscreener" in link:
         print("Found 1 Market Screener link:", link)
-        classification = "Market Screener"
         url, subject = scrape_market_screen_article_page(link, subject)
         if url != "N/A":
             return url, subject
     elif "bloomberg" in link:
         print("Found 1 Bloomberg link:", link)
-        classification = "Bloomberg"
         url, subject = scrape_bloomberg_article_page(link, subject)
         if url != "N/A":
             return url, subject
     elif "yahoo" in link:
         print("Found 1 Yahoo Finance link:", link)
-        classification = "Yahoo Finance"
         url, subject = scrape_yahoo_finance_article_page(link, subject)
     elif "marketwatch" in link:
         print("Found 1 MarketWatch link:", link)
-        classification = "MarketWatch"
         url, subject = scrape_market_watch_article_page(link, subject)
     else:
         print("Unrecognized link type: " + link)
@@ -651,13 +643,13 @@ def scrape_twitter(url, subject):
                 link_domain_div = soup.find('div', {'class': 'css-901oao css-1hf3ou5 r-14j79pv r-37j5jr r-a023e6 r-16dba41 r-rjixqe r-bcqeeo r-qvutc0'}) # domain text
                 if link_domain_div:
                     if "twitter" in link_domain_div:
-                        return scraping(link, subject, classification="Twitter")
+                        return scraping(link, subject)
                     elif "bloomberg" in link_domain_div:
-                        return scraping(link, subject, classification="Bloomberg")
+                        return scraping(link, subject)
                     elif "reuters" in link_domain_div:
-                        return scraping(link, subject, classification="Reuters")
+                        return scraping(link, subject)
                     elif "seekingalpha" in link_domain_div:
-                        return scraping(link, subject, classification="Seeking Alpha")
+                        return scraping(link, subject)
         else:
             print("Not relevant")
             return "N/A", subject
