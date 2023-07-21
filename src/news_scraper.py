@@ -160,6 +160,9 @@ def scraping(link, subject):
     # elif "zerohedge" in link:
     #     print("Found 1 ZeroHedge link:", link)
     #     url, subject = scrape_zero_hedge_article_page(link, subject)
+    elif "businesswire" in link:
+        print("Found 1 BusinessWire link:", link)
+        url, subject = scrape_business_wire_article_page(link, subject)
     else:
         print("Unrecognized link type: " + link)
 
@@ -269,15 +272,28 @@ def scrape_reuters(subject):
         return "N/A", subject
 
 def scrape_market_watch_article_page(url, subject):
+    response = requests_get(url)
+    soup = BeautifulSoup(response.content, 'lxml-xml')
     try:
-        response = requests_get(url)
-        soup = BeautifulSoup(response.content, 'lxml-xml')
-        headline = soup.select_one('h1', {'class': 'article__headline'}).text.strip()
-        div_element = soup.find('div', class_=lambda x: x and x.startswith('article__body'))
-        paragraph_texts = div_element.find('p').text.strip()
-        print("Headline:", headline)
-        context = headline.join(paragraph_texts)
-        similarity = similarity_score(subject, context)
+        if 'discover' in url: # https://www.marketwatch.com/discover?url=https%3A%2F%2Fwww.marketwatch.com%2Famp%2Fstory%2Fguid%2Fe1208ebc-4da6-11ea-833c-a3261b110a22&link=sfmw_tw#https://www.marketwatch.com/amp/story/guid/e1208ebc-4da6-11ea-833c-a3261b110a22?mod=dist_amp_social
+            body = soup.find('body', class_=lambda classes: classes and 'amp-mode-mouse' in classes.split())
+            if body:
+                article = body.find('article')
+                if article:
+                    h1_text = article.find('h1').text.strip()
+                    h2_text = article.find('h2').text.strip()
+                    article_body_div = article.find('div', class_=lambda classes: classes and 'article__body' in classes.split())
+                    article_body_subdivs = article_body_div.find_all('div')
+                    article_paragraphs = [div.find_all('p') for div in article_body_subdivs]
+                    article_paragraphs_texts = [p.text.strip() for p in article_paragraphs]
+                    article_paragraphs_text = " ".join(article_paragraphs_texts)
+        else:
+            headline = soup.select_one('h1', {'class': 'article__headline'}).text.strip()
+            div_element = soup.find('div', class_=lambda x: x and x.startswith('article__body'))
+            paragraph_texts = div_element.find('p').text.strip()
+            print("Headline:", headline)
+            context = headline.join(paragraph_texts)
+            similarity = similarity_score(subject, context)
         if similarity > 0.8:
             print("Relevant")
             print("Context:", context)
@@ -288,6 +304,31 @@ def scrape_market_watch_article_page(url, subject):
     except Exception as e:
         print("Error in MarketWatch:", e)
         return "N/A", subject
+
+def scrape_business_wire_article_page(url, subject):
+    response = requests_get(url)
+    soup = BeautifulSoup(response.content, 'lxml-xml')
+    print("Business Wire, soup:", soup.text)
+    try:
+        headline_h1 = soup.find('h1', {'class': 'epi-fontLg bwalignc'}).text.strip()
+        print("Headline:", headline_h1)
+        headline = headline_h1.find('b').text.strip()
+        body_div = soup.find('div', {'class': 'bw-release-story'})
+        paragraph_texts = body_div.find('p').text.strip() # only select first paragraph
+        context = headline.join(paragraph_texts)
+        print("Headline:", headline)
+        similarity = similarity_score(subject, context)
+        if similarity > 0.8:
+            print("Relevant")
+            print("Context:", context)
+            return url, subject + ". With full context: " + context
+        else:
+            print("Not relevant")
+            return "N/A", subject
+    except Exception as e:
+        print("Error in Business Wire:", e)
+        return "N/A", subject
+
 
 def scrape_wsj(subject):
     try:
