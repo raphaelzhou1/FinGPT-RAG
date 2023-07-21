@@ -3,7 +3,7 @@ import random
 import time
 import json
 import re
-
+import html
 import html_to_json
 import multiprocessing
 import urllib.parse
@@ -107,7 +107,7 @@ def similarity_score(a, b):
     return similarity
 
 
-def requests_get_with_proxy(url, proxy=None):
+def requests_get(url, proxy=None):
     try:
         sleep_time = random.randint(1, 5)
         time.sleep(sleep_time)
@@ -134,17 +134,57 @@ def requests_get_with_proxy(url, proxy=None):
         print("Error: " + str(e))
         return None
 
-def scraping(link, subject, classification=None):
-    if classification == "Seeking Alpha" or "seekingalpha" in link:
+def requests_get_for_seeking_alpha(url, subject):
+    headers = {
+        "accept": "*/*",
+        "accept-language": "zh-CN,zh;q=0.9,en;q=0.8",
+        "cache-control": "no-cache",
+        "origin": "https://seekingalpha.com",
+        "pragma": "no-cache",
+        "referer": "https://seekingalpha.com/",
+        "sec-ch-ua": "\"Not.A/Brand\";v=\"8\", \"Chromium\";v=\"114\", \"Google Chrome\";v=\"114\"",
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": "\"Windows\"",
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "cross-site",
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
+    }
+    url = "https://r4rrlsfs4a.execute-api.us-west-2.amazonaws.com/production/search"
+    params = {
+        "q": "(and '{}' content_type:'news')".format(subject),
+        "q.parser": "structured",
+        "sort": "rank1 desc",
+        "size": "10",
+        "start": "0",
+        "q.options": "{\"fields\":[\"author\",\"author_url\",\"content^1\",\"content_type\",\"image_url\",\"primary_symbols\",\"secondary_symbols\",\"summary\",\"tags\",\"title^3\",\"uri\"]}",
+        "highlight.title": "{pre_tag:'<strong>',post_tag:'<<<<strong>'},",
+        "highlight.summary": "{pre_tag:'<strong>',post_tag:'<<<<strong>'},",
+        "highlight.content": "{pre_tag:'<strong>',post_tag:'<<<<strong>'},",
+        "highlight.author": "{pre_tag:'<strong>',post_tag:'<<<<strong>'},",
+        "highlight.primary_symbols": "{pre_tag:'<strong>',post_tag:'<<<<strong>'}"
+    }
+    response = requests.get(url, headers=headers, params=params)
+
+    response.encoding = 'utf-8'
+    print("amazon.com method for requesting seeking alpha", html.unescape(response.json().get("hits").get("hit")[0].get("highlights")))
+    return "N/A", subject
+
+def scraping(link, subject):
+    classification = None
+
+    if "seekingalpha" in link:
         print("Found 1 Seeking Alpha link:", link)
+        classification = "Seeking Alpha"
+        requests_get_for_seeking_alpha(link, subject)
         if "xml" not in link:
             print("Non-.xml case of Seeking Alpha")
-            url, subject = scrape_seeking_alpha_article_page(link, subject)
+            url, subject = requests_get_for_seeking_alpha(link, subject)
             if url != "N/A":
                 return url, subject
         elif "xml" in link:
             print(".xml case of Seeking Alpha")
-            response = requests_get_with_proxy(link)
+            response = requests_get(link)
             soup = BeautifulSoup(response.content, 'lxml-xml')
             hyphenated_subject = "-".join([word.strip("'\"") for word in subject.split()])
             print("Hyphenated subject:", hyphenated_subject)
@@ -158,36 +198,43 @@ def scraping(link, subject, classification=None):
                 if url != "N/A":
                     return url, subject
             print("Didn't find from .xml")
-    elif classification == "Reuters" or "reuters" in link:
+    elif "reuters" in link:
         print("Found 1 Reuters link:", link)
+        classification = "Reuters"
         url, subject = scrape_reuters(subject)
         if url != "N/A":
             return url, subject
-    elif classification == "Twitter" or "twitter" in link:
+    elif "twitter" in link:
         print("Found 1 Twitter link:", link)
+        classification = "Twitter"
         url, subject = scrape_twitter(link, subject)
         if url != "N/A":
             return url, subject
-    elif classification == "Market Screener" or "marketscreener" in link:
+    elif "marketscreener" in link:
         print("Found 1 Market Screener link:", link)
+        classification = "Market Screener"
         url, subject = scrape_market_screen_article_page(link, subject)
         if url != "N/A":
             return url, subject
-    elif classification == "Bloomberg" or "bloomberg" in link:
+    elif "bloomberg" in link:
         print("Found 1 Bloomberg link:", link)
+        classification = "Bloomberg"
         url, subject = scrape_bloomberg_article_page(link, subject)
         if url != "N/A":
             return url, subject
-    elif classification == "Yahoo Finance" or "yahoo" in link:
+    elif "yahoo" in link:
         print("Found 1 Yahoo Finance link:", link)
+        classification = "Yahoo Finance"
         url, subject = scrape_yahoo_finance_article_page(link, subject)
-    elif classification == "MarketWatch" or "marketwatch" in link:
+    elif "marketwatch" in link:
         print("Found 1 MarketWatch link:", link)
+        classification = "MarketWatch"
         url, subject = scrape_market_watch_article_page(link, subject)
     else:
         print("Unrecognized link type: " + link)
 
     return "N/A", subject
+
 
 
 def scrape_bloomberg(subject):
@@ -199,7 +246,7 @@ def scrape_bloomberg(subject):
         full_url = 'https://www.bloomberg.com/search?query=' + url_encoded_subject + '&sort=relevance:asc&startTime=2015-04-01T01:01:01.001Z&' + '&page=' + str(
             1)
         print("Trying url " + full_url)
-        response = requests_get_with_proxy(full_url)
+        response = requests_get(full_url)
         print("Response code: " + str(response.status_code))
         soup = BeautifulSoup(response.content, 'html.parser')
         links = [a['href'] for a in soup.select('a[class^="headline_"]') if 'href' in a.attrs]
@@ -211,7 +258,7 @@ def scrape_bloomberg(subject):
 
 
 def scrape_bloomberg_article_page(url, subject):
-    response = requests_get_with_proxy(url)
+    response = requests_get(url)
     soup = BeautifulSoup(response.content, 'html.parser')
     headline = soup.select_one('h1', {'class': 'HedAndDek_headline-D19MOidHYLI-'}).text.strip()
 
@@ -248,7 +295,7 @@ def scrape_reuters(subject):
 
         full_url = 'https://www.reuters.com/search/news?blob=' + url_encoded_subject
         print("Trying url " + full_url)
-        response = requests_get_with_proxy(full_url)
+        response = requests_get(full_url)
         soup = BeautifulSoup(response.content, 'html.parser')
         link_elements = soup.select('h3.search-result-title > a')
         links = [link['href'] for link in link_elements]
@@ -258,7 +305,7 @@ def scrape_reuters(subject):
             full_link = "https://www.reuters.com" + link
             print("Link:", full_link)
 
-            response = requests_get_with_proxy(full_link)
+            response = requests_get(full_link)
             soup = BeautifulSoup(response.content, 'html.parser')
 
             news_format = "type_1" # https://www.reuters.com/article/idUSKCN20K2SM
@@ -297,7 +344,7 @@ def scrape_reuters(subject):
 
 def scrape_market_watch_article_page(url, subject):
     try:
-        response = requests_get_with_proxy(url)
+        response = requests_get(url)
         soup = BeautifulSoup(response.content, 'lxml-xml')
         headline = soup.select_one('h1', {'class': 'article__headline'}).text.strip()
         div_element = soup.find('div', class_=lambda x: x and x.startswith('article__body'))
@@ -324,7 +371,7 @@ def scrape_wsj(subject):
 
         full_url = 'https://www.wsj.com/search?query=' + url_encoded_subject + '&operator=OR&sort=relevance&duration=1y&startDate=2015%2F01%2F01&endDate=2016%2F01%2F01'
         print("Trying url " + full_url)
-        response = requests_get_with_proxy(full_url)
+        response = requests_get(full_url)
         soup = BeautifulSoup(response.content, 'html.parser')
         link_elements = soup.select('h3[class^="WSJTheme--headline"] a')
         links = [link['href'] for link in link_elements]
@@ -334,7 +381,7 @@ def scrape_wsj(subject):
             full_link = link
             print("Link:", full_link)
 
-            response = requests_get_with_proxy(full_link)
+            response = requests_get(full_link)
             soup = BeautifulSoup(response.content, 'html.parser')
 
             news_format = "type_1" # https://www.reuters.com/article/idUSKCN20K2SM
@@ -422,7 +469,7 @@ def scrape_seeking_alpha(subject):
 
 def scrape_seeking_alpha_article_page(url, subject):
     try:
-        response = requests_get_with_proxy(url)
+        response = requests_get(url)
         soup = BeautifulSoup(response.content, 'lxml-xml')
 
         if "symbol" in url:
@@ -459,7 +506,7 @@ def scrape_seeking_alpha_article_page(url, subject):
 
 def scrape_market_screen_article_page(url, subject):
     try:
-        response = requests_get_with_proxy(url)
+        response = requests_get(url)
         soup = BeautifulSoup(response.content, 'lxml-xml')
 
         headline_text = soup.select('h1', {'class': 'title title__primary mb-15 txt-bold'}).text.strip()
@@ -500,8 +547,8 @@ def scrape_google(subject):
         full_url = 'https://www.google.com/search?q="' + url_encoded_subject + '"+site%3Atwitter.com+OR+site%3Aseekingalpha.com+OR+site%3Areuters.com+OR+site%3Amarketscreener.com+OR+site%3Ayahoo.com'
         print("Trying url " + full_url)
 
-        # response = requests_get_with_proxy(full_url)
-        response = requests_get_with_proxy(full_url)
+        # response = requests_get(full_url)
+        response = requests_get(full_url)
 
         links = []
 
@@ -559,7 +606,7 @@ def scrape_twitter(url, subject):
 
 def scrape_twitter(url, subject):
     try:
-        response = requests_get_with_proxy(url)
+        response = requests_get(url)
         # print("Twitter GET response: ", response.content)
         soup = BeautifulSoup(response.content, 'lxml-xml')
         # print(soup.text)
@@ -642,7 +689,7 @@ def scrape_yahoo(subject):
 
         full_url = 'https://seekingalpha.com/search?q=' + url_encoded_subject + '&tab=headlines'
         print("Trying url " + full_url)
-        response = requests_get_with_proxy(full_url)
+        response = requests_get(full_url)
         soup = BeautifulSoup(response.content, 'html.parser')
         link_elements = soup.select('a[data-test-id="post-list-item-title"]')
         links = [link['href'] for link in link_elements]
@@ -652,7 +699,7 @@ def scrape_yahoo(subject):
             full_link = "https://seekingalpha.com/" + link
             print("Link:", full_link)
 
-            response = requests_get_with_proxy(full_link)
+            response = requests_get(full_link)
             soup = BeautifulSoup(response.content, 'html.parser')
 
 
@@ -665,7 +712,7 @@ def scrape_yahoo(subject):
 
 def scrape_yahoo_finance_article_page(url, subject):
     try:
-        response = requests_get_with_proxy(url)
+        response = requests_get(url)
         soup = BeautifulSoup(response.content, 'lxml-xml')
 
         headline_div = soup.find('div', {'class': 'caas-title-wrapper'})
