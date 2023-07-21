@@ -6,6 +6,7 @@ import re
 import html
 import html_to_json
 import multiprocessing
+import logging
 import urllib.parse
 from dotenv import load_dotenv
 import pandas as pd
@@ -26,6 +27,11 @@ chrome_driver_path = '/usr/local/bin'  # Replace this with the actual path to Ch
 os.environ["PATH"] += os.pathsep + chrome_driver_path
 chrome_browser_path = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'  # Path to Chrome browser executable
 
+# logging.basicConfig()
+# logging.getLogger().setLevel(logging.DEBUG)
+# requests_log = logging.getLogger("requests.packages.urllib3")
+# requests_log.setLevel(logging.DEBUG)
+# requests_log.propagate = True
 
 # Sentence Tokenization methods:
 import re
@@ -135,6 +141,7 @@ def requests_get(url, proxy=None):
         return None
 
 def requests_get_for_seeking_alpha(url, subject):
+    print("amazon.com method for requesting seeking alpha")
     headers = {
         "accept": "*/*",
         "accept-language": "zh-CN,zh;q=0.9,en;q=0.8",
@@ -167,7 +174,7 @@ def requests_get_for_seeking_alpha(url, subject):
     response = requests.get(url, headers=headers, params=params)
 
     response.encoding = 'utf-8'
-    print("amazon.com method for requesting seeking alpha", html.unescape(response.json().get("hits").get("hit")[0].get("highlights")))
+    print(html.unescape(response.json().get("hits").get("hit")[0].get("highlights")))
     return "N/A", subject
 
 def scraping(link, subject):
@@ -546,8 +553,6 @@ def scrape_google(subject):
 
         soup = BeautifulSoup(response.content, 'html5lib')
 
-
-
         father_divs = soup.find_all('div', {'class': 'kvH3mc BToiNc UK95Uc'})
         for father_div in father_divs:
             upper_div = father_div.find('div', {'class': 'Z26q7c UK95Uc jGGQ5e'})
@@ -555,15 +560,17 @@ def scrape_google(subject):
 
             lower_div = father_div.find('div', {'class': 'Z26q7c UK95Uc'})
             lower_subdiv = lower_div.find('div', {'class': 'VwiC3b yXK7lf MUxGbd yDYNvb lyLwlc lEBKkf'})
-            lower_span = lower_subdiv.find('span')
-            lower_ems = lower_span.find_all('em')
-            lower_div_text = ' '.join([em.text.strip() for em in lower_ems])
+            lower_spans = lower_subdiv.find_all('span')
+            lower_div_text = ''
+            for lower_span in lower_spans:
+                lower_ems = lower_span.find_all('em')
+                lower_div_text += ' '.join([em.text.strip() for em in lower_ems])
 
             upper_div_a = upper_subdiv.find('a', {'href': lambda href: href})
             if upper_div_a:
                 upper_div_text = upper_div_a.find('h3').text.strip()
 
-                google_result = upper_div_text + " " + lower_div_text
+                google_result = upper_div_text + ". " + lower_div_text
                 similarity = similarity_score(subject, google_result)
                 print("Google result:", google_result)
                 if similarity > 0.75:
