@@ -4,6 +4,7 @@ import json
 import re
 import multiprocessing
 import requests
+import tweepy
 import urllib.parse
 from dotenv import load_dotenv
 import pandas as pd
@@ -23,6 +24,12 @@ chrome_driver_path = '/usr/local/bin'  # Replace this with the actual path to Ch
 os.environ["PATH"] += os.pathsep + chrome_driver_path
 chrome_browser_path = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'  # Path to Chrome browser executable
 
+twitter_api_key = os.getenv("TWITTER_API_KEY")
+twitter_api_key_secret = os.getenv("TWITTER_API_KEY_SECRET")
+twitter_access_token = os.getenv("TWITTER_ACCESS_TOKEN")
+twitter_access_token_secret = os.getenv("TWITTER_ACCESS_TOKEN_SECRET")
+auth = tweepy.OAuth1UserHandler(twitter_api_key, twitter_api_key_secret, twitter_access_token, twitter_access_token_secret)
+api = tweepy.API(auth)
 
 # Sentence Tokenization methods:
 import re
@@ -136,11 +143,11 @@ def scraping(link, subject):
         url, subject = scrape_reuters(subject)
         if url != "N/A":
             return url, subject
-    # elif "twitter" in link:
-    #     print("Found 1 Twitter link:", link)
-    #     url, subject = scrape_twitter(link, subject)
-    #     if url != "N/A":
-    #         return url, subject
+    elif "twitter" in link:
+        print("Found 1 Twitter link:", link)
+        url, subject = scrape_twitter(link, subject)
+        if url != "N/A":
+            return url, subject
     elif "marketscreener" in link:
         print("Found 1 Market Screener link:", link)
         url, subject = scrape_market_screen_article_page(link, subject)
@@ -192,33 +199,37 @@ def scrape_bloomberg(subject):
 
 
 def scrape_bloomberg_article_page(url, subject):
-    response = requests_get(url)
-    soup = BeautifulSoup(response.content, 'html.parser')
-    headline = soup.select_one('h1', {'class': 'HedAndDek_headline-D19MOidHYLI-'}).text.strip()
+    try:
+        response = requests_get(url)
+        soup = BeautifulSoup(response.content, 'html.parser')
+        headline = soup.select_one('h1', {'class': 'HedAndDek_headline-D19MOidHYLI-'}).text.strip()
 
-    bullet_point_texts = ""
-    bullet_points = soup.select('ul', {'class': 'HedAndDek_abstract-XX636-2bHQw-'})
-    if bullet_points:
-        lis = bullet_points.find_all('li')
-        if lis:
-            bullet_point_texts = " ".join([li.text.strip() for li in lis])
-    headline_plus_bullet_points = headline + ". " + bullet_point_texts
+        bullet_point_texts = ""
+        bullet_points = soup.select('ul', {'class': 'HedAndDek_abstract-XX636-2bHQw-'})
+        if bullet_points:
+            lis = bullet_points.find_all('li')
+            if lis:
+                bullet_point_texts = " ".join([li.text.strip() for li in lis])
+        headline_plus_bullet_points = headline + ". " + bullet_point_texts
 
-    paragraph_texts = ""
-    paragraphs = soup.select_all('p', {'class': 'Paragraph_text-SqIsdNjh0t0-'})
-    for p in paragraphs:
-        if "Sign up" in p.text:
-            continue
+        paragraph_texts = ""
+        paragraphs = soup.select_all('p', {'class': 'Paragraph_text-SqIsdNjh0t0-'})
+        for p in paragraphs:
+            if "Sign up" in p.text:
+                continue
+            else:
+                paragraph_texts = " ".join(p.text.strip())
+        headline_plus_bullet_points_plus_paragraphs = headline_plus_bullet_points + ". " + paragraph_texts
+
+        similarity = similarity_score(subject, headline_plus_bullet_points_plus_paragraphs)
+        if similarity > 0.8:
+            print("Found a Bloomberg article with similarity score:", similarity)
+            return url, headline_plus_bullet_points_plus_paragraphs
         else:
-            paragraph_texts = " ".join(p.text.strip())
-    headline_plus_bullet_points_plus_paragraphs = headline_plus_bullet_points + ". " + paragraph_texts
-
-    similarity = similarity_score(subject, headline_plus_bullet_points_plus_paragraphs)
-    if similarity > 0.8:
-        print("Found a Bloomberg article with similarity score:", similarity)
-        return url, headline_plus_bullet_points_plus_paragraphs
-    else:
-        print("Not relevant")
+            print("Not relevant")
+            return "N/A", subject
+    except Exception as e:
+        print("Error: " + str(e))
         return "N/A", subject
 
 def scrape_reuters(subject):
@@ -523,6 +534,7 @@ def scrape_cnbc_article_page(url, subject):
         similarity = similarity_score(subject, context)
         if similarity > 0.8:
             print("Relevant")
+            print("Context:", context)
             return url, subject + ". With full context: " + context
     except Exception as e:
         print("Exception in scrape_cnbc_article_page:", e)
@@ -593,6 +605,23 @@ def scrape_google(subject):
 #         driver.quit()
 
 def scrape_twitter(url, subject):
+
+    if "i/web/status/" in url:
+        tweet_id = get_tweet_id(url)
+        tweet = api.get_status(tweet_id, tweet_mode="extended")
+        print("Tweet text:", tweet.full_text)
+        similarity = similarity_score(subject, tweet.full_text)
+        if similarity > 0.75:
+            print("Relevant")
+            return url, subject + ". With full context: " + tweet.full_text
+
+def get_tweet_id(url):
+    match = re.search(r"status/(\d+)", url)
+    if match:
+        return match.group(1)
+    return None
+
+def scrape_twitter_through_website(url, subject): # not feasible
     try:
         response = requests_get(url)
         # print("Twitter GET response: ", response.content)
@@ -801,16 +830,14 @@ def select_column_and_classify():
                     if link:
                         print("Financial statement:", remaining_sentence, "Link:", link)
                         url, contextualized_sentence = scraping(link, remaining_sentence)
+                        df.at[row_index, "link"] = url
+                        df.at[row_index, "contextualized_sentence"] = contextualized_sentence
+
                     # else:
                     #     print("Financial statement:", remaining_sentence)
                     #     url, contextualized_sentence = scrape_google(remaining_sentence)
 
-                    # Try all
-                    # if url == "N/A":
-                    #     url, contextualized_sentence = scrape_reuters(remaining_sentence)
-                    # url, contextualized_sentence = scrape_seeking_alpha(remaining_sentence)
-                    df.at[row_index, "link"] = url
-                    df.at[row_index, "contextualized_sentence"] = contextualized_sentence
+
 
                     counter += 1
 
