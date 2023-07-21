@@ -2,18 +2,30 @@ import os
 import random
 import time
 import json
+import re
+
 import html_to_json
 import multiprocessing
 import urllib.parse
 from dotenv import load_dotenv
 import pandas as pd
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
 from bs4 import BeautifulSoup
 from zenrows import ZenRowsClient
 import requests
 import easygui as gui
 from difflib import SequenceMatcher
 
+# TODO: Twitter API requests # https://twitter.com/bryan4665/
+
+
 load_dotenv()
+
+chrome_driver_path = '/usr/local/bin'  # Replace this with the actual path to Chromedriver
+os.environ["PATH"] += os.pathsep + chrome_driver_path
+chrome_browser_path = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'  # Path to Chrome browser executable
+
 
 # Sentence Tokenization methods:
 def split_sentence(sentence):
@@ -22,12 +34,10 @@ def split_sentence(sentence):
     remaining_sentence = sentence
 
     # Split based on $
-    if '$' in sentence:
-        parts = sentence.split()
-        for word in parts:
-            if '$' in word:
-                ticker.append(word.strip('$'))
-                remaining_sentence = remaining_sentence.replace(word, '').strip()
+    ticker_matches = re.findall(r'\$[A-Z]+', remaining_sentence)
+    for match in ticker_matches:
+        ticker.append(match.strip('$'))
+        remaining_sentence = remaining_sentence.replace(match, '').strip()
 
     # Split based on http
     if 'http' in remaining_sentence:
@@ -109,14 +119,14 @@ def requests_get_with_proxy(url, proxy=None):
             # Add more User-Agent strings as needed
         ]
         headers = {
-            'User-Agent': random.choice(user_agents),
-            'Referer': 'https://seekingalpha.com/search?q=&tab=headlines'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36',
+            'Referer': 'https://seekingalpha.com/symbol/DNKN/news',
+            'Cookie': 'machine_cookie=0427091031005; _gcl_au=1.1.1005531817.1683650457; _pcid=%7B%22browserId%22%3A%22lhgi0f449va50asj%22%7D; _pcus=eyJ1c2VyU2VnbWVudHMiOm51bGx9; _ga=GA1.1.571982864.1683650457; _pctx=%7Bu%7DN4IgrgzgpgThIC4B2YA2qA05owMoBcBDfSREQpAeyRCwgEt8oBJAE0RXQF8g; g_state={"i_p":1683657760251,"i_l":1}; __pnahc=255; __pat=-14400000; _hjFirstSeen=1; _hjIncludedInSessionSample_65666=0; _hjSession_65666=eyJpZCI6ImIzMjA5MDc4LWE5MGYtNDQ0Yy04ODBkLTM3OWY1YjNkNjVhOSIsImNyZWF0ZWQiOjE2ODk3NzkzNjQyOTcsImluU2FtcGxlIjpmYWxzZX0=; pxcts=3fac07b0-2646-11ee-bff1-616f70657664; _pxvid=478e1d92-ee88-11ed-b1b8-3ca69df203a9; __pvi=eyJpZCI6InYtMjAyMy0wNy0xOS0yMy0wOS0zMi02Njktc1JHZER1QkgzR252VHQxYy01MjI3MWRmODU3ZWE4NzMwNjczYmQ2M2JkZTI4ODhhNiIsImRvbWFpbiI6Ii5zZWVraW5nYWxwaGEuY29tIiwidGltZSI6MTY4OTc3OTM3MjY2OX0%3D; __tbc=%7Bkpex%7DDrVMv-S2Lu44MbwIrOYGeU7FfHdrk2vbdbHOR3NF62cwA75AfFmA_eSFgY7p3f_X; xbc=%7Bkpex%7DTP8YvFWJqW8JPT1Sd_4S5w-w4GKfXlC35UKXSyc2ZW4fGAzntp-ZdjfHYH-ipMBSlxNIenCc6UQx83ynAHa1ZzbEQf1mPw4k0lmSIgJwrwhjUl2t2vEr9zUmIAwmb1K2vC-VfvwNTuZ6mMy34ViltC6KerStsrZOgAc-srfgeb8xu2WP1sWHOtEcQlI3X_tl0qE2kLzVHF9XS7k59oFocAIsMt9MqEdldpZBjT8a1NZW20szyRBIppg2pxiECSOFyDgI2UzgKuKqjDgQQuz_ovq_oFS6m-5kfxXl02r0bTA; sailthru_pageviews=2; _uetsid=3ede2e80264611eebc148d442b00d4cf; _uetvid=46ad8ae0ee8811ed8be87bcb9b56b00b; _hjSessionUser_65666=eyJpZCI6IjA4ZGUwZmQwLWY2NzAtNTNiOS1iMzU0LTZjNGFlZmU3MTBlZiIsImNyZWF0ZWQiOjE2ODk3NzkzNjQyOTEsImV4aXN0aW5nIjp0cnVlfQ==; sailthru_content=eaca8a3ebde49b34d28768f72fae972f3c5f57e561d9315a8a9a86be8720511e40f35d5811aadb491568a010d9e8412955f840c37c2c459dd8a3af459c70dc7c; sailthru_visitor=f3dfa04b-a344-4fc4-82dd-4165853dce73; _conv_v=vi%3A1*sc%3A1*cs%3A1689779364*fs%3A1689779364*pv%3A2*exp%3A%7B100037059.%7Bv.1000217424-g.%7B100030295.1-100030296.1%7D%7D-100037060.%7Bv.1000217426-g.%7B%7D%7D%7D; _conv_s=si%3A1*sh%3A1689779364047-0.31875808241036085*pv%3A2; _px=qy8b0Ak1J37TryVQ0s49/AS7z4OgQKvCYu6G3QgfA1AQdP8tx5RJhanpuA5DwliVFww7T8GOntqWAl3juuwCAw==:1000:P/s5wj9cep4grNwRVMlpfY1F1KXSnTKhiCBhAa5Bg+oYJxLo+YQpQS98wYDGvux9YqFR4lmhBNlXuhiDZsVipN4iFg0VH14Yu+nqxdNDXcWWors4Ju3iXP6CRVBz7JZNV4db3lhg83WHgI+SlkzpbAZQdlN6xo2YiIky0fW1kaSvzwDIbLv+9pgZ6PEN9BYeJASjjSDSHZB41vtV/uhW7v/liaMB+wkMsEyxhNDJiGJc7a5sVEFooI45nq6AQo6jCnCpkWga/jNvpkL22r1JSg==; _px2=eyJ1IjoiNDU0OGE4ZTAtMjY0Ni0xMWVlLWFkMjYtYWY5OTAwZWFiNzFmIiwidiI6IjQ3OGUxZDkyLWVlODgtMTFlZC1iMWI4LTNjYTY5ZGYyMDNhOSIsInQiOjE2ODk3ODAwMDYxMzcsImgiOiJiMzcyNDI0ODNmZmVmNzUzOGVjMTlhNTA1NGIxNTZkNTU5MjQ1MDYzYzNkNmMzYWMzMTIzOGIwOTAyOWNhOThmIn0=; _pxde=0056db64e1c15fff119cb3115ba5d2755dfb655597f3309250fce29f2494d80f:eyJ0aW1lc3RhbXAiOjE2ODk3Nzk1MDYxMzcsImZfa2IiOjB9; _ga_KGRFF2R2C5=GS1.1.1689779364.3.1.1689779565.60.0.0; LAST_VISITED_PAGE=%7B%22pageKey%22%3A%224e91f493-684f-4c49-a8e1-b5947b434c4e%22%7D'
         }
 
         # print("Headers:", headers)
         session = requests.Session()
         session.headers.update(headers)
-
         response = session.get(url, proxies=proxy)
         return response
     except Exception as e:
@@ -139,7 +149,7 @@ def scraping(link, subject, classification=None):
             print("Hyphenated subject:", hyphenated_subject)
 
             # Find the first <loc> whose text contains the hyphenated subject
-            loc_element = soup.find('loc', text=lambda text: hyphenated_subject in text)
+            loc_element = soup.find('loc', text=lambda string: hyphenated_subject in string)
             if loc_element:
                 link = loc_element.text
                 print("Found:", link, "from .xml")
@@ -506,14 +516,16 @@ def scrape_google(subject):
             lower_ems = lower_span.find_all('em')
             lower_div_text = ' '.join([em.text.strip() for em in lower_ems])
 
-            link_element = upper_subdiv.find('a', {'href': lambda href: href})
-            if link_element:
-                upper_div_text = upper_subdiv.find('h3').text.strip()
+            upper_div_a = upper_subdiv.find('a', {'href': lambda href: href})
+            if upper_div_a:
+                upper_div_text = upper_div_a.find('h3').text.strip()
 
-                similarity = similarity_score(subject, upper_div_text.join(lower_div_text))
+                google_result = upper_div_text + " " + lower_div_text
+                similarity = similarity_score(subject, google_result)
+                print("Google result:", google_result)
                 if similarity > 0.75:
                     print("Relevant")
-                    link = link_element['href']
+                    link = upper_div_a['href']
                     return scraping(link, subject)
 
         print("Link not found")
@@ -524,9 +536,29 @@ def scrape_google(subject):
 
 
 def scrape_twitter(url, subject):
+    options = Options()
+    options.add_argument('--headless')  # Run the browser in headless mode (without GUI)
+    options.add_argument('--disable-gpu')  # Disable GPU usage to avoid issues in headless mode
+    options.add_argument('--no-sandbox')  # Disable sandboxing for headless mode in some environments
+    driver = webdriver.Chrome(options=options)
+
+    try:
+        driver.get(url)
+        time.sleep(5)  # Wait for the JavaScript content to load (adjust the waiting time as needed)
+        content = driver.page_source
+        return content
+    except Exception as e:
+        print("Error: " + str(e))
+        return None
+    finally:
+        driver.quit()
+
+def scrape_twitter(url, subject):
     try:
         response = requests_get_with_proxy(url)
+        print("Twitter GET response: ", response.content)
         soup = BeautifulSoup(response.content, 'lxml-xml')
+        print(soup.text)
 
         if 'status' in url:
             twitter_post_div = soup.select('div', {'class': 'css-901oao r-18jsvk2 r-37j5jr r-1inkyih r-16dba41 r-135wba7 r-bcqeeo r-bnwqim r-qvutc0'})
@@ -582,6 +614,22 @@ def scrape_twitter(url, subject):
         print("Exception in scrape_seeking_alpha_article_page:", e)
         return "N/A", subject
 
+def webdrive_twitter(url):
+    chrome_options = webdriver.ChromeOptions()
+    chrome_options.binary_location = chrome_browser_path
+    driver = webdriver.Chrome(options=chrome_options)
+
+    try:
+        driver.get(url)
+        time.sleep(5)  # Wait for the JavaScript content to load (adjust the waiting time as needed)
+        content = driver.page_source
+        return content
+    except Exception as e:
+        print("Error: " + str(e))
+        return None
+    finally:
+        driver.quit()
+
 def scrape_yahoo(subject):
     try:
         client = ZenRowsClient("6026db40fdbc3db28235753087be6225f047542f")
@@ -616,18 +664,19 @@ def scrape_yahoo_finance_article_page(url, subject):
         response = requests_get_with_proxy(url)
         soup = BeautifulSoup(response.content, 'lxml-xml')
 
-        headline_element = soup.select_one('h1[data-test-id="post-title"]')
-        headline_text = headline_element.text.strip()
+        headline_div = soup.find('div', {'class': 'caas-title-wrapper'})
+        headline_text = headline_div.find('h1').text.strip()
         print("Headline:", headline_text)
 
         similarity = similarity_score(subject, headline_text)
         if similarity > 0.8:
             # if news_format == "type_1":
             print("Relevant")
-            paragraph_elements = soup.select('p[class^="Paragraph-paragraph-"]')
+            paragraph_div = soup.find('div', {'class': 'caas-body'})
+            paragraph_elements = paragraph_div.find_all('p')
             paragraph_text = ' '.join([p.text.strip() for p in paragraph_elements])
             print("Context:", paragraph_text)
-            return full_link, subject + ". With full context: " + paragraph_text
+            return url, subject + ". With full context: " + paragraph_text
             # elif news_format == "type_2":
             #     print("Relevant")
             #     paragraph_elements = soup.select('p[class^="text__text__"]')
