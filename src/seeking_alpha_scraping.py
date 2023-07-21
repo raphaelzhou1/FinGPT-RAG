@@ -1,4 +1,4 @@
-import requests
+import requests_url
 import random
 import json
 import csv

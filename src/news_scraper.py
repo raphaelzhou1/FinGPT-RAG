@@ -1,24 +1,18 @@
 import os
-import random
 import time
 import json
 import re
-import html
-import html_to_json
 import multiprocessing
-import logging
+import requests
 import urllib.parse
 from dotenv import load_dotenv
 import pandas as pd
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from bs4 import BeautifulSoup
-from zenrows import ZenRowsClient
-import requests
+import requests_url
 import easygui as gui
-from difflib import SequenceMatcher
-
-from proxies import headers, getProxy, getHeaders, loginSA
+from requests_url import requests_get
 
 # TODO: Twitter API requests # https://twitter.com/bryan4665/
 
@@ -29,14 +23,6 @@ chrome_driver_path = '/usr/local/bin'  # Replace this with the actual path to Ch
 os.environ["PATH"] += os.pathsep + chrome_driver_path
 chrome_browser_path = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'  # Path to Chrome browser executable
 
-# logging.basicConfig()
-# logging.getLogger().setLevel(logging.DEBUG)
-# requests_log = logging.getLogger("requests.packages.urllib3")
-# requests_log.setLevel(logging.DEBUG)
-# requests_log.propagate = True
-
-global proxies
-proxies = getProxy()
 
 # Sentence Tokenization methods:
 import re
@@ -46,12 +32,12 @@ def split_sentence(sentence):
     url = []
     remaining_sentence = sentence
 
+    # Process sentence:
     # Split based on $
     ticker_matches = re.findall(r'^\$[A-Z]+', remaining_sentence)
     for match in ticker_matches:
         ticker.append(match.strip('$'))
         remaining_sentence = remaining_sentence.replace(match, '').strip()
-
     # Split based on http
     if 'http' in remaining_sentence:
         parts = remaining_sentence.split()
@@ -59,9 +45,11 @@ def split_sentence(sentence):
             if 'http' in word:
                 url.append(word)
                 remaining_sentence = remaining_sentence.replace(word, '').strip()
-
     # Delete "- " and leading/trailing spaces
     remaining_sentence = remaining_sentence.replace("- ", "").replace("\n", "").strip()
+
+    # Process url:
+    url = requests_url.get_redirected_domain(url)
 
     return ticker, remaining_sentence, url
 
@@ -117,80 +105,14 @@ def similarity_score(a, b):
     similarity = matching_words / min(len(words_a), len(words_b))
     return similarity
 
-
-def requests_get(url, proxy=None):
-    try:
-        sleep_time = random.randint(1, 5)
-        time.sleep(sleep_time)
-
-        user_agents = [
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/113.0',
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
-            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
-            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
-            # Add more User-Agent strings as needed
-        ]
-
-        headers = {
-            'User-Agent': random.choice(user_agents),
-            'Referer': 'https://seekingalpha.com/search?q=&tab=headlines'
-        }
-
-        # print("Headers:", headers)
-        session = requests.Session()
-        session.headers.update(headers)
-        response = session.get(url, headers=getHeaders(1), proxies=proxies)
-        return response
-    except Exception as e:
-        print("Error: " + str(e))
-        return None
-
-def requests_get_for_seeking_alpha(url, subject):
-    print("amazon.com method for requesting seeking alpha")
-    headers = {
-        "accept": "*/*",
-        "accept-language": "zh-CN,zh;q=0.9,en;q=0.8",
-        "cache-control": "no-cache",
-        "origin": "https://seekingalpha.com",
-        "pragma": "no-cache",
-        "referer": "https://seekingalpha.com/",
-        "sec-ch-ua": "\"Not.A/Brand\";v=\"8\", \"Chromium\";v=\"114\", \"Google Chrome\";v=\"114\"",
-        "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": "\"Windows\"",
-        "sec-fetch-dest": "empty",
-        "sec-fetch-mode": "cors",
-        "sec-fetch-site": "cross-site",
-        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
-    }
-    url = "https://r4rrlsfs4a.execute-api.us-west-2.amazonaws.com/production/search"
-    params = {
-        "q": "(and '{}' content_type:'news')".format(subject),
-        "q.parser": "structured",
-        "sort": "rank1 desc",
-        "size": "10",
-        "start": "0",
-        "q.options": "{\"fields\":[\"author\",\"author_url\",\"content^1\",\"content_type\",\"image_url\",\"primary_symbols\",\"secondary_symbols\",\"summary\",\"tags\",\"title^3\",\"uri\"]}",
-        "highlight.title": "{pre_tag:'<strong>',post_tag:'<<<<strong>'},",
-        "highlight.summary": "{pre_tag:'<strong>',post_tag:'<<<<strong>'},",
-        "highlight.content": "{pre_tag:'<strong>',post_tag:'<<<<strong>'},",
-        "highlight.author": "{pre_tag:'<strong>',post_tag:'<<<<strong>'},",
-        "highlight.primary_symbols": "{pre_tag:'<strong>',post_tag:'<<<<strong>'}"
-    }
-    print("Sending request to", url, "with headers", headers, "with params", params)
-    response = requests.get(url, headers=headers, params=params)
-
-    response.encoding = 'utf-8'
-    print(html.unescape(response.json().get("hits").get("hit")[0].get("highlights")))
-    return "N/A", subject
-
 def scraping(link, subject):
 
     if "seekingalpha" in link:
         print("Found 1 Seeking Alpha link:", link)
-        requests_get_for_seeking_alpha(link, subject)
+        # requests.requests_get_for_seeking_alpha(link, subject)
         if "xml" not in link:
             print("Non-.xml case of Seeking Alpha")
-            url, subject = requests_get_for_seeking_alpha(link, subject)
+            url, subject = scrape_seeking_alpha_article_page(link, subject)
             if url != "N/A":
                 return url, subject
         elif "xml" in link:
@@ -235,6 +157,9 @@ def scraping(link, subject):
     elif "marketwatch" in link:
         print("Found 1 MarketWatch link:", link)
         url, subject = scrape_market_watch_article_page(link, subject)
+    elif "zerohedge" in link:
+        print("Found 1 ZeroHedge link:", link)
+        url, subject = scrape_zero_hedge_article_page(link, subject)
     else:
         print("Unrecognized link type: " + link)
 
@@ -244,8 +169,6 @@ def scraping(link, subject):
 
 def scrape_bloomberg(subject):
     try:
-        client = ZenRowsClient("6026db40fdbc3db28235753087be6225f047542f")
-        params = {"premium_proxy": "true", "proxy_country": "us"}
         url_encoded_subject = url_encode_string(subject)
 
         full_url = 'https://www.bloomberg.com/search?query=' + url_encoded_subject + '&sort=relevance:asc&startTime=2015-04-01T01:01:01.001Z&' + '&page=' + str(
@@ -294,8 +217,6 @@ def scrape_bloomberg_article_page(url, subject):
 
 def scrape_reuters(subject):
     try:
-        client = ZenRowsClient("6026db40fdbc3db28235753087be6225f047542f")
-        params = {"premium_proxy": "true", "proxy_country": "us"}
         url_encoded_subject = url_encode_string(subject)
 
         full_url = 'https://www.reuters.com/search/news?blob=' + url_encoded_subject
@@ -370,8 +291,6 @@ def scrape_market_watch_article_page(url, subject):
 
 def scrape_wsj(subject):
     try:
-        client = ZenRowsClient("6026db40fdbc3db28235753087be6225f047542f")
-        params = {"premium_proxy": "true", "proxy_country": "us"}
         url_encoded_subject = url_encode_string(subject)
 
         full_url = 'https://www.wsj.com/search?query=' + url_encoded_subject + '&operator=OR&sort=relevance&duration=1y&startDate=2015%2F01%2F01&endDate=2016%2F01%2F01'
@@ -425,13 +344,11 @@ def scrape_wsj(subject):
 
 def scrape_seeking_alpha(subject):
     try:
-        client = ZenRowsClient("6026db40fdbc3db28235753087be6225f047542f")
-        params = {"js_render": "true", "antibot": "true"}
         url_encoded_subject = url_encode_string(subject)
         full_url = 'https://seekingalpha.com/search?q=' + url_encoded_subject + '&tab=headlines'
         print("Trying url " + full_url)
 
-        response = client.get(full_url, params=params)
+        response = requests_get(full_url)
 
         # JSONN parsing method
         # json_response = html_to_json.convert(response.content)
@@ -545,8 +462,6 @@ def scrape_market_screen_article_page(url, subject):
 
 def scrape_google(subject):
     try:
-        client = ZenRowsClient("6026db40fdbc3db28235753087be6225f047542f")
-        params = {"js_render": "true", "antibot": "true"}
         url_encoded_subject = url_encode_string(subject)
         # Search Operators https://moz.com/learn/seo/search-operators
         full_url = 'https://www.google.com/search?q="' + url_encoded_subject + '"+site%3Atwitter.com+OR+site%3Aseekingalpha.com+OR+site%3Areuters.com+OR+site%3Amarketscreener.com+OR+site%3Ayahoo.com'
@@ -688,8 +603,6 @@ def webdrive_twitter(url):
 
 def scrape_yahoo(subject):
     try:
-        client = ZenRowsClient("6026db40fdbc3db28235753087be6225f047542f")
-        params = {"premium_proxy": "true", "proxy_country": "us"}
         url_encoded_subject = url_encode_string(subject)
 
         full_url = 'https://seekingalpha.com/search?q=' + url_encoded_subject + '&tab=headlines'
@@ -706,8 +619,6 @@ def scrape_yahoo(subject):
 
             response = requests_get(full_link)
             soup = BeautifulSoup(response.content, 'html.parser')
-
-
 
         print("Context not found in Yahoo")
         return "N/A", subject
@@ -821,11 +732,12 @@ def select_column_and_classify():
 
                     if link:
                         print("Financial statement:", remaining_sentence, "Link:", link)
+                        url, contextualized_sentence = scraping(link, remaining_sentence)
                     else:
                         print("Financial statement:", remaining_sentence)
+                        url, contextualized_sentence = scrape_google(remaining_sentence)
 
                     # Try all
-                    url, contextualized_sentence = scrape_google(remaining_sentence)
                     # if url == "N/A":
                     #     url, contextualized_sentence = scrape_reuters(remaining_sentence)
                     # url, contextualized_sentence = scrape_seeking_alpha(remaining_sentence)

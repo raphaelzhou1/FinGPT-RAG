@@ -1,6 +1,6 @@
 import os
 import csv
-import requests
+import requests_url
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
