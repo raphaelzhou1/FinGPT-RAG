@@ -169,6 +169,9 @@ def scraping(link, subject, classification=None):
     elif classification == "Yahoo Finance" or "yahoo" in link:
         print("Found 1 Yahoo Finance link:", link)
         url, subject = scrape_yahoo_finance_article_page(link, subject)
+    elif classification == "MarketWatch" or "marketwatch" in link:
+        print("Found 1 MarketWatch link:", link)
+        url, subject = scrape_market_watch_article_page(link, subject)
     else:
         print("Unrecognized link type: " + link)
 
@@ -263,13 +266,13 @@ def scrape_reuters(subject):
                     print("Relevant")
                     paragraph_elements = soup.select('p[class^="Paragraph-paragraph-"]')
                     paragraph_text = ' '.join([p.text.strip() for p in paragraph_elements])
-                    print("Text:", paragraph_text)
+                    print("Context:", paragraph_text)
                     return full_link, subject + ". With full context: " + paragraph_text
                 elif news_format == "type_2":
                     print("Relevant")
                     paragraph_elements = soup.select('p[class^="text__text__"]')
                     paragraph_text = ' '.join([p.text.strip() for p in paragraph_elements])
-                    print("Text:", paragraph_text)
+                    print("Context:", paragraph_text)
                     return full_link, subject + ". With full context: " + paragraph_text
             else:
                 print("Not relevant")
@@ -278,6 +281,27 @@ def scrape_reuters(subject):
         return "N/A", subject
     except Exception as e:
         print("Error in Reuters:", e)
+        return "N/A", subject
+
+def scrape_market_watch_article_page(url, subject):
+    try:
+        response = requests_get_with_proxy(url)
+        soup = BeautifulSoup(response.content, 'lxml-xml')
+        headline = soup.select_one('h1', {'class': 'article__headline'}).text.strip()
+        div_element = soup.find('div', class_=lambda x: x and x.startswith('article__body'))
+        paragraph_texts = div_element.find('p').text.strip()
+        print("Headline:", headline)
+        context = headline.join(paragraph_texts)
+        similarity = similarity_score(subject, context)
+        if similarity > 0.8:
+            print("Relevant")
+            print("Context:", context)
+            return url, subject + ". With full context: " + context
+        else:
+            print("Not relevant")
+            return "N/A", subject
+    except Exception as e:
+        print("Error in MarketWatch:", e)
         return "N/A", subject
 
 def scrape_wsj(subject):
@@ -318,13 +342,13 @@ def scrape_wsj(subject):
                 print("Relevant")
                 paragraph_elements = soup.select('p[class^="Paragraph-paragraph-"]')
                 paragraph_text = ' '.join([p.text.strip() for p in paragraph_elements])
-                print("Text:", paragraph_text)
+                print("Context:", paragraph_text)
                 return full_link, subject + ". With full context: " + paragraph_text
                 # elif news_format == "type_2":
                 #     print("Relevant")
                 #     paragraph_elements = soup.select('p[class^="text__text__"]')
                 #     paragraph_text = ' '.join([p.text.strip() for p in paragraph_elements])
-                #     print("Text:", paragraph_text)
+                #     print("Context:", paragraph_text)
                 #     return full_link, subject + ". With full context: " + paragraph_text
             else:
                 print("Not relevant")
@@ -410,18 +434,9 @@ def scrape_seeking_alpha_article_page(url, subject):
                 print("Hidden Seeking Alpha article case")
                 ps = div.find_all('p')
                 paragraph_text = ' '.join([p.text.strip() for p in ps])
-            print("Text:", paragraph_text)
+            print("Context:", paragraph_text)
             return url, subject + ". With full context: " + paragraph_text
-        else: # https://seekingalpha.com/symbol/PRTYQ/news?page=2
-            # print("Maybe in news summary column?")
-            # divs = soup.find_all('div', {'class': 'sa-IL'})
-            # print("Soup ,", soup)
-            # print("Found divs", divs)
-            # for div in divs:
-            #     h3 = div.find('h3')
-            #     a = h3.find('a')
-            #     if similarity_score(a.text.strip()) > 0.8:
-            #         return scrape_seeking_alpha_article_page(a['href'], subject)
+        else:
             print("Not relevant")
             return "N/A", subject
     except Exception as e:
@@ -453,7 +468,7 @@ def scrape_market_screen_article_page(url, subject):
                             else:
                                 context += paragraph.text.strip()
 
-            print("Text:", context)
+            print("Context:", context)
             return url, subject + ". With full context: " + context
         else:
             print("Not relevant")
@@ -611,13 +626,13 @@ def scrape_yahoo_finance_article_page(url, subject):
             print("Relevant")
             paragraph_elements = soup.select('p[class^="Paragraph-paragraph-"]')
             paragraph_text = ' '.join([p.text.strip() for p in paragraph_elements])
-            print("Text:", paragraph_text)
+            print("Context:", paragraph_text)
             return full_link, subject + ". With full context: " + paragraph_text
             # elif news_format == "type_2":
             #     print("Relevant")
             #     paragraph_elements = soup.select('p[class^="text__text__"]')
             #     paragraph_text = ' '.join([p.text.strip() for p in paragraph_elements])
-            #     print("Text:", paragraph_text)
+            #     print("Context:", paragraph_text)
             #     return full_link, subject + ". With full context: " + paragraph_text
         else:
             print("Not relevant")
