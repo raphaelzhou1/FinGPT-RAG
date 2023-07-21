@@ -460,6 +460,9 @@ def scrape_market_screen_article_page(url, subject):
         print("Exception in scrape_seeking_alpha_article_page:", e)
         return "N/A", subject
 
+def scrape_zero_hedge_article_page(url, subject):
+
+
 def scrape_google(subject):
     try:
         url_encoded_subject = url_encode_string(subject)

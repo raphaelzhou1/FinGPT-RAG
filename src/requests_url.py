@@ -90,8 +90,7 @@ def get_redirected_domain(url):
             return None
         response = requests.head(url[0], allow_redirects=True)
         final_url = response.url
-        domain = urlparse(final_url).netloc
-        return domain
+        return final_url
     except requests.exceptions.RequestException as e:
         print("Error:", e)
         return None
