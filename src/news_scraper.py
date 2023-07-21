@@ -131,38 +131,41 @@ def scraping(link, subject):
                 if url != "N/A":
                     return url, subject
             print("Didn't find from .xml")
-    # elif "reuters" in link:
-    #     print("Found 1 Reuters link:", link)
-    #     url, subject = scrape_reuters(subject)
+    elif "reuters" in link:
+        print("Found 1 Reuters link:", link)
+        url, subject = scrape_reuters(subject)
+        if url != "N/A":
+            return url, subject
+    # elif "twitter" in link:
+    #     print("Found 1 Twitter link:", link)
+    #     url, subject = scrape_twitter(link, subject)
     #     if url != "N/A":
     #         return url, subject
-    # # elif "twitter" in link:
-    # #     print("Found 1 Twitter link:", link)
-    # #     url, subject = scrape_twitter(link, subject)
-    # #     if url != "N/A":
-    # #         return url, subject
-    # elif "marketscreener" in link:
-    #     print("Found 1 Market Screener link:", link)
-    #     url, subject = scrape_market_screen_article_page(link, subject)
-    #     if url != "N/A":
-    #         return url, subject
-    # elif "bloomberg" in link:
-    #     print("Found 1 Bloomberg link:", link)
-    #     url, subject = scrape_bloomberg_article_page(link, subject)
-    #     if url != "N/A":
-    #         return url, subject
-    # elif "yahoo" in link:
-    #     print("Found 1 Yahoo Finance link:", link)
-    #     url, subject = scrape_yahoo_finance_article_page(link, subject)
-    # elif "marketwatch" in link:
-    #     print("Found 1 MarketWatch link:", link)
-    #     url, subject = scrape_market_watch_article_page(link, subject)
-    # # elif "zerohedge" in link:
-    # #     print("Found 1 ZeroHedge link:", link)
-    # #     url, subject = scrape_zero_hedge_article_page(link, subject)
-    # elif "businesswire" in link:
-    #     print("Found 1 BusinessWire link:", link)
-    #     url, subject = scrape_business_wire_article_page(link, subject)
+    elif "marketscreener" in link:
+        print("Found 1 Market Screener link:", link)
+        url, subject = scrape_market_screen_article_page(link, subject)
+        if url != "N/A":
+            return url, subject
+    elif "bloomberg" in link:
+        print("Found 1 Bloomberg link:", link)
+        url, subject = scrape_bloomberg_article_page(link, subject)
+        if url != "N/A":
+            return url, subject
+    elif "yahoo" in link:
+        print("Found 1 Yahoo Finance link:", link)
+        url, subject = scrape_yahoo_finance_article_page(link, subject)
+    elif "marketwatch" in link:
+        print("Found 1 MarketWatch link:", link)
+        url, subject = scrape_market_watch_article_page(link, subject)
+    # elif "zerohedge" in link:
+    #     print("Found 1 ZeroHedge link:", link)
+    #     url, subject = scrape_zero_hedge_article_page(link, subject)
+    elif "businesswire" in link:
+        print("Found 1 BusinessWire link:", link)
+        url, subject = scrape_business_wire_article_page(link, subject)
+    elif "cnbc" in link:
+        print("Found 1 CNBC link:", link)
+        url, subject = scrape_cnbc_article_page(link, subject)
     else:
         print("Unrecognized link type: " + link)
 
@@ -503,6 +506,27 @@ def scrape_market_screen_article_page(url, subject):
 
 # def scrape_zero_hedge_article_page(url, subject):
 
+def scrape_cnbc_article_page(url, subject):
+    try:
+        response = requests_get(url)
+        soup = BeautifulSoup(response.content, 'lxml-xml')
+        headline_h1 = soup.find('h1', {'class': 'ArticleHeader-headline'})
+        keypoints_div = soup.find('div', {'class': 'RenderKeyPoints-list'})
+        if keypoints_div:
+            keypoints_subdiv = keypoints_div.find('div', {'class': 'group'})
+            keypoints = keypoints_subdiv.find('ul').find_all('li')
+            keypoints_text = ' '.join([keypoint.text.strip() for keypoint in keypoints])
+        else:
+            keypoints_text = ""
+
+        context = headline_h1.text.strip() + " " + keypoints_text
+        similarity = similarity_score(subject, context)
+        if similarity > 0.8:
+            print("Relevant")
+            return url, subject + ". With full context: " + context
+    except Exception as e:
+        print("Exception in scrape_cnbc_article_page:", e)
+        return "N/A", subject
 
 def scrape_google(subject):
     try:

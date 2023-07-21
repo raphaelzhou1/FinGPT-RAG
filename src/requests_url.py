@@ -40,7 +40,8 @@ def requests_get(url, proxy=None):
         # session = requests.Session()
         # session.headers.update(headers)
         # response = session.get(url)
-        response = requests.get(url, headers=headers.getHeaders(1))
+        response = requests.get(url)
+        # response = requests.get(url, headers=headers.getHeaders(1))
         return response
     except Exception as e:
         print("Error: " + str(e))
