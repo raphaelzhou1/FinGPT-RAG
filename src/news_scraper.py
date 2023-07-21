@@ -467,7 +467,7 @@ def scrape_google(subject):
         params = {"js_render": "true", "antibot": "true"}
         url_encoded_subject = url_encode_string(subject)
         # Search Operators https://moz.com/learn/seo/search-operators
-        full_url = 'https://www.google.com/search?q="' + url_encoded_subject + '&as_oq=Twitter+Seeking+Alpha+Reuters+Market+Screener'
+        full_url = 'https://www.google.com/search?q="' + url_encoded_subject + '"+site%3Atwitter.com+OR+site%3Aseekingalpha.com+OR+site%3Areuters.com+OR+site%3Amarketscreener.com+OR+site%3Ayahoo.com'
         print("Trying url " + full_url)
 
         # response = requests_get_with_proxy(full_url)
@@ -623,10 +623,10 @@ def select_column_and_classify():
             df = pd.read_csv(file_path)
             column_names = df.columns.tolist()
 
-            selected_column = gui.buttonbox("Column Selection",
+            sentence_column = gui.buttonbox("Column Selection",
                                             "Select the column of sentence for classification:",
                                             choices=column_names)
-            if not selected_column:
+            if not sentence_column:
                 raise ValueError("Invalid column selection")
 
             df["classification"] = ""  # Create a new column named "classification"
@@ -638,7 +638,7 @@ def select_column_and_classify():
                 classification_prompt = default_classification_prompt
 
             for row_index, row in df.iloc[1:].iterrows():
-                target_sentence = row[selected_column]
+                target_sentence = row[sentence_column]
                 classification_response = extract_classification(target_sentence, classification_prompt)
                 df.at[row_index, "classification"] = classification_response  # Assign classification response to the new column
 
@@ -654,17 +654,19 @@ def select_column_and_classify():
     # Research contexts for sentences
     try:
         context_choice = gui.ynbox("Do you want to research the context for this news?", "Context Research")
+        process_existing_file = gui.ynbox("Do you want process an existing file?", "Context Research")
         if context_choice:
             file_path = gui.fileopenbox("Select the CSV file containing news for context research", filetypes=["*.csv"])
             df = pd.read_csv(file_path)
             column_names = df.columns.tolist()
-            df["link"] = ""  # Create a new column named "link"
-            df["contextualized_sentence"] = ""  # Create a new column named "contextualized sentence"
+            if not process_existing_file:
+                df["link"] = ""  # Create a new column named "link"
+                df["contextualized_sentence"] = ""  # Create a new column named "contextualized sentence"
 
             if file_path:
-                selected_column = gui.buttonbox("Column Selection", "Select the column for target sentence in the CSV:",
+                sentence_column = gui.buttonbox("Column Selection", "Select the column for target sentence in the CSV:",
                                                 choices=column_names)
-                if not selected_column:
+                if not sentence_column:
                     raise ValueError("Invalid context selected selection")
                 classification_column = gui.buttonbox("Column Selection",
                                                       "Select the column for classification in the CSV:",
@@ -673,8 +675,12 @@ def select_column_and_classify():
                     raise ValueError("Invalid context classification column selection")
 
                 counter = 0  # Counter variable to track the number of rows processed
-                for row_index, row in df.iloc[1:].iterrows():
-                    target_sentence = row[selected_column]
+                for row_index, row in df.iterrows():
+                    # If role is not empty or N/A or has the same sentence as "contextualized_sentence", means context is added, then skip
+                    if process_existing_file and row["link"] != "N/A" and not pd.isnull(row["link"]) and row[sentence_column] != row["contextualized_sentence"]:
+                        continue
+
+                    target_sentence = row[sentence_column]
                     ticker, remaining_sentence, link = split_sentence(target_sentence)
 
                     if link:
@@ -683,10 +689,10 @@ def select_column_and_classify():
                         print("Financial statement:", remaining_sentence)
 
                     # Try all
-                    # url, contextualized_sentence = scrape_google(remaining_sentence)
-                    # if url == "N/A":
-                    #     url, contextualized_sentence = scrape_reuters(remaining_sentence)
-                    url, contextualized_sentence = scrape_seeking_alpha(remaining_sentence)
+                    url, contextualized_sentence = scrape_google(remaining_sentence)
+                    if url == "N/A":
+                        url, contextualized_sentence = scrape_reuters(remaining_sentence)
+                    # url, contextualized_sentence = scrape_seeking_alpha(remaining_sentence)
                     df.at[row_index, "link"] = url
                     df.at[row_index, "contextualized_sentence"] = contextualized_sentence
 
@@ -709,10 +715,10 @@ def select_column_and_classify():
         output_file_path = os.path.splitext(file_path)[0] + "_scraped.csv"
         df.to_csv(output_file_path, index=False)
 
-def process_row(row_index, row, selected_column):
+def process_row(row_index, row, sentence_column):
     # Process each row here
 
-    target_sentence = row[selected_column]
+    target_sentence = row[sentence_column]
     ticker, remaining_sentence, link = split_sentence(target_sentence)
 
     if link:
