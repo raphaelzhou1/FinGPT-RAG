@@ -777,9 +777,9 @@ def select_column_and_classify():
                     if link:
                         print("Financial statement:", remaining_sentence, "Link:", link)
                         url, contextualized_sentence = scraping(link, remaining_sentence)
-                    else:
-                        print("Financial statement:", remaining_sentence)
-                        url, contextualized_sentence = scrape_google(remaining_sentence)
+                    # else:
+                    #     print("Financial statement:", remaining_sentence)
+                    #     url, contextualized_sentence = scrape_google(remaining_sentence)
 
                     # Try all
                     # if url == "N/A":
