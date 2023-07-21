@@ -102,10 +102,10 @@ def requests_get_with_proxy(url, proxy=None):
 
         user_agents = [
             'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
-            # 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/113.0',
-            # 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
-            # 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
-            # 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/113.0',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
             # Add more User-Agent strings as needed
         ]
         headers = {
@@ -127,6 +127,7 @@ def scraping(link, subject, classification=None):
     if classification == "Seeking Alpha" or "seekingalpha" in link:
         print("Found 1 Seeking Alpha link:", link)
         if "xml" not in link:
+            print("Non-.xml case of Seeking Alpha")
             url, subject = scrape_seeking_alpha_article_page(link, subject)
             if url != "N/A":
                 return url, subject
@@ -157,7 +158,7 @@ def scraping(link, subject, classification=None):
             return url, subject
     elif classification == "Market Screener" or "marketscreener" in link:
         print("Found 1 Market Screener link:", link)
-        url, subject = scrape_market_screener(link, subject)
+        url, subject = scrape_market_screen_article_page(link, subject)
         if url != "N/A":
             return url, subject
     elif classification == "Bloomberg" or "bloomberg" in link:
@@ -165,8 +166,12 @@ def scraping(link, subject, classification=None):
         url, subject = scrape_bloomberg_article_page(link, subject)
         if url != "N/A":
             return url, subject
+    elif classification == "Yahoo Finance" or "yahoo" in link:
+        print("Found 1 Yahoo Finance link:", link)
+        url, subject = scrape_yahoo_finance_article_page(link, subject)
+    else:
+        print("Unrecognized link type: " + link)
 
-    print("Unrecognized link type: " + link)
     return "N/A", subject
 
 
@@ -384,22 +389,18 @@ def scrape_seeking_alpha_article_page(url, subject):
         response = requests_get_with_proxy(url)
         soup = BeautifulSoup(response.content, 'lxml-xml')
 
-        news_format = "type_1" # https://www.reuters.com/article/idUSKCN20K2SM
-        # try:
-        title = soup.select('title')
-        headline_text = title[0].text
-        print("Headline:", headline_text)
-        # except AttributeError:
-        #     headline_element = soup.select_one('h1[class^="text__text__"]')
-        #     headline_text = headline_element.text.strip()
-        #     print("Headline:", headline_text)
-        #     news_format = "type_2" # https://www.reuters.com/article/idUSKBN2KT0BX
+        if "symbol" in url:
+            print("Symbol page of Seeking Alpha")
+            a_titles = soup.find('a', {'class': 'sa-v'})
+            for a_title in a_titles:
+                title = a_title.text.strip()
+                if similarity_score(subject, title) > 0.8:
+                    print("Found article: ", title)
+                    print("Relevant")
+                    return scrape_seeking_alpha_article_page(a_title['href'], subject)
 
-        similarity = similarity_score(subject, headline_text)
-        if similarity > 0.8:
-            # if news_format == "type_1":
-            print("Relevant")
-
+        if "news" in url:
+            print("News page of Seeking Alpha")
             div = soup.find('div', {'class': 'lm-ls'})
             ul = div.find('ul')
             if ul: # https://seekingalpha.com/news/3540034-dell-hpe-targets-trimmed-on-compute-headwinds
@@ -476,25 +477,29 @@ def scrape_google(subject):
         links = []
 
         soup = BeautifulSoup(response.content, 'html5lib')
+
+
+
         father_divs = soup.find_all('div', {'class': 'kvH3mc BToiNc UK95Uc'})
         for father_div in father_divs:
             upper_div = father_div.find('div', {'class': 'Z26q7c UK95Uc jGGQ5e'})
-            divs = upper_div.find_all('div', {'class': 'yuRUbf'})
-            for child_div in divs:
-                link_element = child_div.find('a', {'href': lambda href: href})
-                if link_element:
+            upper_subdiv = upper_div.find('div', {'class': 'yuRUbf'})
+
+            lower_div = father_div.find('div', {'class': 'Z26q7c UK95Uc'})
+            lower_subdiv = lower_div.find('div', {'class': 'VwiC3b yXK7lf MUxGbd yDYNvb lyLwlc lEBKkf'})
+            lower_span = lower_subdiv.find('span')
+            lower_ems = lower_span.find_all('em')
+            lower_div_text = ' '.join([em.text.strip() for em in lower_ems])
+
+            link_element = upper_subdiv.find('a', {'href': lambda href: href})
+            if link_element:
+                upper_div_text = upper_subdiv.find('h3').text.strip()
+
+                similarity = similarity_score(subject, upper_div_text.join(lower_div_text))
+                if similarity > 0.75:
+                    print("Relevant")
                     link = link_element['href']
                     return scraping(link, subject)
-
-
-        # print("Seeking Alpha article not indexed")
-        # if len(links) == 0:
-        #     span = soup.find('span')
-        #     em = span.find('em')
-        #     for div in divs:
-        #         a = div.find('a', {'class': 'mt-X R-dW R-eB R-fg R-fZ V-gT V-g9 V-hj V-hY V-ib V-ip'})
-        #
-        #     print("Found " + str(len(links)) + " links")
 
         print("Link not found")
         return "N/A", subject
@@ -508,15 +513,23 @@ def scrape_twitter(url, subject):
         response = requests_get_with_proxy(url)
         soup = BeautifulSoup(response.content, 'lxml-xml')
 
-        news_format = "type_1" # https://www.reuters.com/article/idUSKCN20K2SM
-        twitter_post_div = soup.select('div', {'class': 'css-901oao r-18jsvk2 r-37j5jr r-1inkyih r-16dba41 r-135wba7 r-bcqeeo r-bnwqim r-qvutc0'})
-        twitter_post_spans = twitter_post_div.find_all('span')
-        twitter_post_text = ""
-        for twitter_post_span in twitter_post_spans:
-            twitter_texts = twitter_post_span.find_all('span')
-            for twitter_text in twitter_texts:
-                twitter_post_text += twitter_text.text
-        print("Twitter text:", twitter_post_text)
+        if 'status' in url:
+            twitter_post_div = soup.select('div', {'class': 'css-901oao r-18jsvk2 r-37j5jr r-1inkyih r-16dba41 r-135wba7 r-bcqeeo r-bnwqim r-qvutc0'})
+            twitter_post_spans = twitter_post_div.find_all('span')
+            twitter_post_text = ""
+            for twitter_post_span in twitter_post_spans:
+                twitter_texts = twitter_post_span.find_all('span')
+                for twitter_text in twitter_texts:
+                    twitter_post_text += twitter_text.text
+            print("Twitter text:", twitter_post_text)
+        else: # https://twitter.com/bryan4665/
+            print("Identified as Twitter personal page")
+            twitter_format = 'personal_page'
+            twitter_post_text = soup.find('span', {
+                'class': 'css-901oao css-16my406 r-poiln3 r-bcqeeo r-qvutc0'})
+            twitter_post_text = twitter_post_text.text.strip()
+            print("Twitter text:", twitter_post_text)
+            soup.find('a', {'class': 'css-4rbku5 css-18t94o4 css-901oao r-14j79pv r-1loqt21 r-xoduu5 r-1q142lx r-1w6e6rj r-37j5jr r-a023e6 r-16dba41 r-9aw3ui r-rjixqe r-bcqeeo r-3s2u2q r-qvutc0'})
 
         similarity = similarity_score(subject, twitter_post_text)
         if similarity > 0.8:
@@ -575,33 +588,7 @@ def scrape_yahoo(subject):
             response = requests_get_with_proxy(full_link)
             soup = BeautifulSoup(response.content, 'html.parser')
 
-            news_format = "type_1" # https://www.reuters.com/article/idUSKCN20K2SM
-            # try:
-            headline_element = soup.select_one('h1[data-test-id="post-title"]')
-            headline_text = headline_element.text.strip()
-            print("Headline:", headline_text)
-            # except AttributeError:
-            #     headline_element = soup.select_one('h1[class^="text__text__"]')
-            #     headline_text = headline_element.text.strip()
-            #     print("Headline:", headline_text)
-            #     news_format = "type_2" # https://www.reuters.com/article/idUSKBN2KT0BX
 
-            similarity = similarity_score(subject, headline_text)
-            if similarity > 0.8:
-                # if news_format == "type_1":
-                print("Relevant")
-                paragraph_elements = soup.select('p[class^="Paragraph-paragraph-"]')
-                paragraph_text = ' '.join([p.text.strip() for p in paragraph_elements])
-                print("Text:", paragraph_text)
-                return full_link, subject + ". With full context: " + paragraph_text
-                # elif news_format == "type_2":
-                #     print("Relevant")
-                #     paragraph_elements = soup.select('p[class^="text__text__"]')
-                #     paragraph_text = ' '.join([p.text.strip() for p in paragraph_elements])
-                #     print("Text:", paragraph_text)
-                #     return full_link, subject + ". With full context: " + paragraph_text
-            else:
-                print("Not relevant")
 
         print("Context not found in Yahoo")
         return "N/A", subject
@@ -609,6 +596,35 @@ def scrape_yahoo(subject):
         print("Error in Yahoo:", e)
         return "N/A", subject
 
+def scrape_yahoo_finance_article_page(url, subject):
+    try:
+        response = requests_get_with_proxy(url)
+        soup = BeautifulSoup(response.content, 'lxml-xml')
+
+        headline_element = soup.select_one('h1[data-test-id="post-title"]')
+        headline_text = headline_element.text.strip()
+        print("Headline:", headline_text)
+
+        similarity = similarity_score(subject, headline_text)
+        if similarity > 0.8:
+            # if news_format == "type_1":
+            print("Relevant")
+            paragraph_elements = soup.select('p[class^="Paragraph-paragraph-"]')
+            paragraph_text = ' '.join([p.text.strip() for p in paragraph_elements])
+            print("Text:", paragraph_text)
+            return full_link, subject + ". With full context: " + paragraph_text
+            # elif news_format == "type_2":
+            #     print("Relevant")
+            #     paragraph_elements = soup.select('p[class^="text__text__"]')
+            #     paragraph_text = ' '.join([p.text.strip() for p in paragraph_elements])
+            #     print("Text:", paragraph_text)
+            #     return full_link, subject + ". With full context: " + paragraph_text
+        else:
+            print("Not relevant")
+
+    except Exception as e:
+        print("Exception in scrape_yahoo_finance_article_page:", e)
+        return "N/A", subject
 
 
 # Function that handles classification of sentences using OpenAI and scraping of news websites
@@ -690,8 +706,8 @@ def select_column_and_classify():
 
                     # Try all
                     url, contextualized_sentence = scrape_google(remaining_sentence)
-                    if url == "N/A":
-                        url, contextualized_sentence = scrape_reuters(remaining_sentence)
+                    # if url == "N/A":
+                    #     url, contextualized_sentence = scrape_reuters(remaining_sentence)
                     # url, contextualized_sentence = scrape_seeking_alpha(remaining_sentence)
                     df.at[row_index, "link"] = url
                     df.at[row_index, "contextualized_sentence"] = contextualized_sentence
