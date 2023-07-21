@@ -136,11 +136,11 @@ def scraping(link, subject):
         url, subject = scrape_reuters(subject)
         if url != "N/A":
             return url, subject
-    elif "twitter" in link:
-        print("Found 1 Twitter link:", link)
-        url, subject = scrape_twitter(link, subject)
-        if url != "N/A":
-            return url, subject
+    # elif "twitter" in link:
+    #     print("Found 1 Twitter link:", link)
+    #     url, subject = scrape_twitter(link, subject)
+    #     if url != "N/A":
+    #         return url, subject
     elif "marketscreener" in link:
         print("Found 1 Market Screener link:", link)
         url, subject = scrape_market_screen_article_page(link, subject)
@@ -460,7 +460,7 @@ def scrape_market_screen_article_page(url, subject):
         print("Exception in scrape_seeking_alpha_article_page:", e)
         return "N/A", subject
 
-def scrape_zero_hedge_article_page(url, subject):
+# def scrape_zero_hedge_article_page(url, subject):
 
 
 def scrape_google(subject):
@@ -509,23 +509,23 @@ def scrape_google(subject):
         return "N/A", subject
 
 
-def scrape_twitter(url, subject):
-    options = Options()
-    options.add_argument('--headless')  # Run the browser in headless mode (without GUI)
-    options.add_argument('--disable-gpu')  # Disable GPU usage to avoid issues in headless mode
-    options.add_argument('--no-sandbox')  # Disable sandboxing for headless mode in some environments
-    driver = webdriver.Chrome(options=options)
-
-    try:
-        driver.get(url)
-        time.sleep(5)  # Wait for the JavaScript content to load (adjust the waiting time as needed)
-        content = driver.page_source
-        return content
-    except Exception as e:
-        print("Error: " + str(e))
-        return None
-    finally:
-        driver.quit()
+# def scrape_twitter(url, subject):
+#     options = Options()
+#     options.add_argument('--headless')  # Run the browser in headless mode (without GUI)
+#     options.add_argument('--disable-gpu')  # Disable GPU usage to avoid issues in headless mode
+#     options.add_argument('--no-sandbox')  # Disable sandboxing for headless mode in some environments
+#     driver = webdriver.Chrome(options=options)
+#
+#     try:
+#         driver.get(url)
+#         time.sleep(5)  # Wait for the JavaScript content to load (adjust the waiting time as needed)
+#         content = driver.page_source
+#         return content
+#     except Exception as e:
+#         print("Error: " + str(e))
+#         return "N/A", subject
+#     finally:
+#         driver.quit()
 
 def scrape_twitter(url, subject):
     try:

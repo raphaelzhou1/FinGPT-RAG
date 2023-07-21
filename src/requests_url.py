@@ -86,7 +86,7 @@ def requests_get_for_seeking_alpha(url, subject):
 
 def get_redirected_domain(url):
     try:
-        if url == None:
+        if len(url) == 0:
             return None
         response = requests.head(url[0], allow_redirects=True)
         final_url = response.url
