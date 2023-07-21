@@ -131,38 +131,38 @@ def scraping(link, subject):
                 if url != "N/A":
                     return url, subject
             print("Didn't find from .xml")
-    elif "reuters" in link:
-        print("Found 1 Reuters link:", link)
-        url, subject = scrape_reuters(subject)
-        if url != "N/A":
-            return url, subject
-    # elif "twitter" in link:
-    #     print("Found 1 Twitter link:", link)
-    #     url, subject = scrape_twitter(link, subject)
+    # elif "reuters" in link:
+    #     print("Found 1 Reuters link:", link)
+    #     url, subject = scrape_reuters(subject)
     #     if url != "N/A":
     #         return url, subject
-    elif "marketscreener" in link:
-        print("Found 1 Market Screener link:", link)
-        url, subject = scrape_market_screen_article_page(link, subject)
-        if url != "N/A":
-            return url, subject
-    elif "bloomberg" in link:
-        print("Found 1 Bloomberg link:", link)
-        url, subject = scrape_bloomberg_article_page(link, subject)
-        if url != "N/A":
-            return url, subject
-    elif "yahoo" in link:
-        print("Found 1 Yahoo Finance link:", link)
-        url, subject = scrape_yahoo_finance_article_page(link, subject)
-    elif "marketwatch" in link:
-        print("Found 1 MarketWatch link:", link)
-        url, subject = scrape_market_watch_article_page(link, subject)
-    # elif "zerohedge" in link:
-    #     print("Found 1 ZeroHedge link:", link)
-    #     url, subject = scrape_zero_hedge_article_page(link, subject)
-    elif "businesswire" in link:
-        print("Found 1 BusinessWire link:", link)
-        url, subject = scrape_business_wire_article_page(link, subject)
+    # # elif "twitter" in link:
+    # #     print("Found 1 Twitter link:", link)
+    # #     url, subject = scrape_twitter(link, subject)
+    # #     if url != "N/A":
+    # #         return url, subject
+    # elif "marketscreener" in link:
+    #     print("Found 1 Market Screener link:", link)
+    #     url, subject = scrape_market_screen_article_page(link, subject)
+    #     if url != "N/A":
+    #         return url, subject
+    # elif "bloomberg" in link:
+    #     print("Found 1 Bloomberg link:", link)
+    #     url, subject = scrape_bloomberg_article_page(link, subject)
+    #     if url != "N/A":
+    #         return url, subject
+    # elif "yahoo" in link:
+    #     print("Found 1 Yahoo Finance link:", link)
+    #     url, subject = scrape_yahoo_finance_article_page(link, subject)
+    # elif "marketwatch" in link:
+    #     print("Found 1 MarketWatch link:", link)
+    #     url, subject = scrape_market_watch_article_page(link, subject)
+    # # elif "zerohedge" in link:
+    # #     print("Found 1 ZeroHedge link:", link)
+    # #     url, subject = scrape_zero_hedge_article_page(link, subject)
+    # elif "businesswire" in link:
+    #     print("Found 1 BusinessWire link:", link)
+    #     url, subject = scrape_business_wire_article_page(link, subject)
     else:
         print("Unrecognized link type: " + link)
 
