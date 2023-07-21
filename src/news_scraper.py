@@ -18,6 +18,8 @@ import requests
 import easygui as gui
 from difflib import SequenceMatcher
 
+from proxies import headers, getProxy, getHeaders, loginSA
+
 # TODO: Twitter API requests # https://twitter.com/bryan4665/
 
 
@@ -32,6 +34,9 @@ chrome_browser_path = '/Applications/Google Chrome.app/Contents/MacOS/Google Chr
 # requests_log = logging.getLogger("requests.packages.urllib3")
 # requests_log.setLevel(logging.DEBUG)
 # requests_log.propagate = True
+
+global proxies
+proxies = getProxy()
 
 # Sentence Tokenization methods:
 import re
@@ -134,7 +139,7 @@ def requests_get(url, proxy=None):
         # print("Headers:", headers)
         session = requests.Session()
         session.headers.update(headers)
-        response = session.get(url, proxies=proxy)
+        response = session.get(url, headers=getHeaders(1), proxies=proxies)
         return response
     except Exception as e:
         print("Error: " + str(e))
@@ -171,6 +176,7 @@ def requests_get_for_seeking_alpha(url, subject):
         "highlight.author": "{pre_tag:'<strong>',post_tag:'<<<<strong>'},",
         "highlight.primary_symbols": "{pre_tag:'<strong>',post_tag:'<<<<strong>'}"
     }
+    print("Sending request to", url, "with headers", headers, "with params", params)
     response = requests.get(url, headers=headers, params=params)
 
     response.encoding = 'utf-8'
