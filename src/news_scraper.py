@@ -157,9 +157,9 @@ def scraping(link, subject):
     elif "marketwatch" in link:
         print("Found 1 MarketWatch link:", link)
         url, subject = scrape_market_watch_article_page(link, subject)
-    elif "zerohedge" in link:
-        print("Found 1 ZeroHedge link:", link)
-        url, subject = scrape_zero_hedge_article_page(link, subject)
+    # elif "zerohedge" in link:
+    #     print("Found 1 ZeroHedge link:", link)
+    #     url, subject = scrape_zero_hedge_article_page(link, subject)
     else:
         print("Unrecognized link type: " + link)
 
