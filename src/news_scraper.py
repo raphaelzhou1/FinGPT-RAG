@@ -28,13 +28,15 @@ chrome_browser_path = '/Applications/Google Chrome.app/Contents/MacOS/Google Chr
 
 
 # Sentence Tokenization methods:
+import re
+
 def split_sentence(sentence):
     ticker = []
     url = []
     remaining_sentence = sentence
 
     # Split based on $
-    ticker_matches = re.findall(r'\$[A-Z]+', remaining_sentence)
+    ticker_matches = re.findall(r'^\$[A-Z]+', remaining_sentence)
     for match in ticker_matches:
         ticker.append(match.strip('$'))
         remaining_sentence = remaining_sentence.replace(match, '').strip()
@@ -111,17 +113,16 @@ def requests_get_with_proxy(url, proxy=None):
         time.sleep(sleep_time)
 
         user_agents = [
-            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/113.0',
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
             'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
             'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
             # Add more User-Agent strings as needed
         ]
+
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36',
-            'Referer': 'https://seekingalpha.com/symbol/DNKN/news',
-            'Cookie': 'machine_cookie=0427091031005; _gcl_au=1.1.1005531817.1683650457; _pcid=%7B%22browserId%22%3A%22lhgi0f449va50asj%22%7D; _pcus=eyJ1c2VyU2VnbWVudHMiOm51bGx9; _ga=GA1.1.571982864.1683650457; _pctx=%7Bu%7DN4IgrgzgpgThIC4B2YA2qA05owMoBcBDfSREQpAeyRCwgEt8oBJAE0RXQF8g; g_state={"i_p":1683657760251,"i_l":1}; __pnahc=255; __pat=-14400000; _hjFirstSeen=1; _hjIncludedInSessionSample_65666=0; _hjSession_65666=eyJpZCI6ImIzMjA5MDc4LWE5MGYtNDQ0Yy04ODBkLTM3OWY1YjNkNjVhOSIsImNyZWF0ZWQiOjE2ODk3NzkzNjQyOTcsImluU2FtcGxlIjpmYWxzZX0=; pxcts=3fac07b0-2646-11ee-bff1-616f70657664; _pxvid=478e1d92-ee88-11ed-b1b8-3ca69df203a9; __pvi=eyJpZCI6InYtMjAyMy0wNy0xOS0yMy0wOS0zMi02Njktc1JHZER1QkgzR252VHQxYy01MjI3MWRmODU3ZWE4NzMwNjczYmQ2M2JkZTI4ODhhNiIsImRvbWFpbiI6Ii5zZWVraW5nYWxwaGEuY29tIiwidGltZSI6MTY4OTc3OTM3MjY2OX0%3D; __tbc=%7Bkpex%7DDrVMv-S2Lu44MbwIrOYGeU7FfHdrk2vbdbHOR3NF62cwA75AfFmA_eSFgY7p3f_X; xbc=%7Bkpex%7DTP8YvFWJqW8JPT1Sd_4S5w-w4GKfXlC35UKXSyc2ZW4fGAzntp-ZdjfHYH-ipMBSlxNIenCc6UQx83ynAHa1ZzbEQf1mPw4k0lmSIgJwrwhjUl2t2vEr9zUmIAwmb1K2vC-VfvwNTuZ6mMy34ViltC6KerStsrZOgAc-srfgeb8xu2WP1sWHOtEcQlI3X_tl0qE2kLzVHF9XS7k59oFocAIsMt9MqEdldpZBjT8a1NZW20szyRBIppg2pxiECSOFyDgI2UzgKuKqjDgQQuz_ovq_oFS6m-5kfxXl02r0bTA; sailthru_pageviews=2; _uetsid=3ede2e80264611eebc148d442b00d4cf; _uetvid=46ad8ae0ee8811ed8be87bcb9b56b00b; _hjSessionUser_65666=eyJpZCI6IjA4ZGUwZmQwLWY2NzAtNTNiOS1iMzU0LTZjNGFlZmU3MTBlZiIsImNyZWF0ZWQiOjE2ODk3NzkzNjQyOTEsImV4aXN0aW5nIjp0cnVlfQ==; sailthru_content=eaca8a3ebde49b34d28768f72fae972f3c5f57e561d9315a8a9a86be8720511e40f35d5811aadb491568a010d9e8412955f840c37c2c459dd8a3af459c70dc7c; sailthru_visitor=f3dfa04b-a344-4fc4-82dd-4165853dce73; _conv_v=vi%3A1*sc%3A1*cs%3A1689779364*fs%3A1689779364*pv%3A2*exp%3A%7B100037059.%7Bv.1000217424-g.%7B100030295.1-100030296.1%7D%7D-100037060.%7Bv.1000217426-g.%7B%7D%7D%7D; _conv_s=si%3A1*sh%3A1689779364047-0.31875808241036085*pv%3A2; _px=qy8b0Ak1J37TryVQ0s49/AS7z4OgQKvCYu6G3QgfA1AQdP8tx5RJhanpuA5DwliVFww7T8GOntqWAl3juuwCAw==:1000:P/s5wj9cep4grNwRVMlpfY1F1KXSnTKhiCBhAa5Bg+oYJxLo+YQpQS98wYDGvux9YqFR4lmhBNlXuhiDZsVipN4iFg0VH14Yu+nqxdNDXcWWors4Ju3iXP6CRVBz7JZNV4db3lhg83WHgI+SlkzpbAZQdlN6xo2YiIky0fW1kaSvzwDIbLv+9pgZ6PEN9BYeJASjjSDSHZB41vtV/uhW7v/liaMB+wkMsEyxhNDJiGJc7a5sVEFooI45nq6AQo6jCnCpkWga/jNvpkL22r1JSg==; _px2=eyJ1IjoiNDU0OGE4ZTAtMjY0Ni0xMWVlLWFkMjYtYWY5OTAwZWFiNzFmIiwidiI6IjQ3OGUxZDkyLWVlODgtMTFlZC1iMWI4LTNjYTY5ZGYyMDNhOSIsInQiOjE2ODk3ODAwMDYxMzcsImgiOiJiMzcyNDI0ODNmZmVmNzUzOGVjMTlhNTA1NGIxNTZkNTU5MjQ1MDYzYzNkNmMzYWMzMTIzOGIwOTAyOWNhOThmIn0=; _pxde=0056db64e1c15fff119cb3115ba5d2755dfb655597f3309250fce29f2494d80f:eyJ0aW1lc3RhbXAiOjE2ODk3Nzk1MDYxMzcsImZfa2IiOjB9; _ga_KGRFF2R2C5=GS1.1.1689779364.3.1.1689779565.60.0.0; LAST_VISITED_PAGE=%7B%22pageKey%22%3A%224e91f493-684f-4c49-a8e1-b5947b434c4e%22%7D'
+            'User-Agent': random.choice(user_agents),
+            'Referer': 'https://seekingalpha.com/search?q=&tab=headlines'
         }
 
         # print("Headers:", headers)
@@ -149,13 +150,14 @@ def scraping(link, subject, classification=None):
             print("Hyphenated subject:", hyphenated_subject)
 
             # Find the first <loc> whose text contains the hyphenated subject
-            loc_element = soup.find('loc', text=lambda string: hyphenated_subject in string)
+            loc_element = soup.find('loc', string=re.compile(hyphenated_subject))
             if loc_element:
                 link = loc_element.text
                 print("Found:", link, "from .xml")
                 url, subject = scrape_seeking_alpha_article_page(link, subject)
                 if url != "N/A":
                     return url, subject
+            print("Didn't find from .xml")
     elif classification == "Reuters" or "reuters" in link:
         print("Found 1 Reuters link:", link)
         url, subject = scrape_reuters(subject)
@@ -425,6 +427,8 @@ def scrape_seeking_alpha_article_page(url, subject):
 
         if "symbol" in url:
             print("Symbol page of Seeking Alpha")
+            print("Response status code: ", response.status_code)
+            print("Response content: ", response.content)
             a_titles = soup.find('a', {'class': 'sa-v'})
             for a_title in a_titles:
                 title = a_title.text.strip()
@@ -556,9 +560,9 @@ def scrape_twitter(url, subject):
 def scrape_twitter(url, subject):
     try:
         response = requests_get_with_proxy(url)
-        print("Twitter GET response: ", response.content)
+        # print("Twitter GET response: ", response.content)
         soup = BeautifulSoup(response.content, 'lxml-xml')
-        print(soup.text)
+        # print(soup.text)
 
         if 'status' in url:
             twitter_post_div = soup.select('div', {'class': 'css-901oao r-18jsvk2 r-37j5jr r-1inkyih r-16dba41 r-135wba7 r-bcqeeo r-bnwqim r-qvutc0'})
