@@ -1,19 +1,24 @@
 import os
 import time
+import sys
 import json
 import re
 import multiprocessing
 import requests
-import tweepy
 import urllib.parse
 from dotenv import load_dotenv
 import pandas as pd
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
 from bs4 import BeautifulSoup
 import requests_url
 import easygui as gui
+
+# From src/
 from requests_url import requests_get
+
+import tweepy
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from searchtweets import load_credentials
 
 # TODO: Twitter API requests # https://twitter.com/bryan4665/
 
@@ -28,6 +33,7 @@ twitter_api_key = os.getenv("TWITTER_API_KEY")
 twitter_api_key_secret = os.getenv("TWITTER_API_KEY_SECRET")
 twitter_access_token = os.getenv("TWITTER_ACCESS_TOKEN")
 twitter_access_token_secret = os.getenv("TWITTER_ACCESS_TOKEN_SECRET")
+twitter_bearer_token = os.getenv("TWITTER_BEARER_TOKEN")
 auth = tweepy.OAuth1UserHandler(twitter_api_key, twitter_api_key_secret, twitter_access_token, twitter_access_token_secret)
 api = tweepy.API(auth)
 
@@ -114,7 +120,7 @@ def similarity_score(a, b):
 
 def scraping(link, subject):
 
-    if "seekingalpha" in link:
+    if "seekingalpha.com" in link:
         print("Found 1 Seeking Alpha link:", link)
         # requests.requests_get_for_seeking_alpha(link, subject)
         if "xml" not in link:
@@ -138,39 +144,39 @@ def scraping(link, subject):
                 if url != "N/A":
                     return url, subject
             print("Didn't find from .xml")
-    elif "reuters" in link:
+    elif "reuters.com" in link:
         print("Found 1 Reuters link:", link)
         url, subject = scrape_reuters(subject)
         if url != "N/A":
             return url, subject
-    elif "twitter" in link:
+    elif "twitter.com" in link:
         print("Found 1 Twitter link:", link)
         url, subject = scrape_twitter(link, subject)
         if url != "N/A":
             return url, subject
-    elif "marketscreener" in link:
+    elif "marketscreener.com" in link:
         print("Found 1 Market Screener link:", link)
         url, subject = scrape_market_screen_article_page(link, subject)
         if url != "N/A":
             return url, subject
-    elif "bloomberg" in link:
+    elif "bloomberg.com" in link:
         print("Found 1 Bloomberg link:", link)
         url, subject = scrape_bloomberg_article_page(link, subject)
         if url != "N/A":
             return url, subject
-    elif "yahoo" in link:
+    elif "yahoo.com" in link:
         print("Found 1 Yahoo Finance link:", link)
         url, subject = scrape_yahoo_finance_article_page(link, subject)
-    elif "marketwatch" in link:
+    elif "marketwatch.com" in link:
         print("Found 1 MarketWatch link:", link)
         url, subject = scrape_market_watch_article_page(link, subject)
     # elif "zerohedge" in link:
     #     print("Found 1 ZeroHedge link:", link)
     #     url, subject = scrape_zero_hedge_article_page(link, subject)
-    elif "businesswire" in link:
+    elif "businesswire.com" in link:
         print("Found 1 BusinessWire link:", link)
         url, subject = scrape_business_wire_article_page(link, subject)
-    elif "cnbc" in link:
+    elif "cnbc.com" in link:
         print("Found 1 CNBC link:", link)
         url, subject = scrape_cnbc_article_page(link, subject)
     else:
@@ -605,15 +611,29 @@ def scrape_google(subject):
 #         driver.quit()
 
 def scrape_twitter(url, subject):
+    try:
+        if "i/web/status/" in url:
+            tweet_id = get_tweet_id(url)
+            endpoint_url = f"https://api.twitter.com/2/tweets?ids={tweet_id}"
+            headers = {
+                "User-Agent": "v2TweetLookupPython",
+                "Authorization": f"Bearer {twitter_bearer_token}"  # Replace 'token' with your actual bearer token
+            }
+            response = requests.get(endpoint_url, headers=headers)
 
-    if "i/web/status/" in url:
-        tweet_id = get_tweet_id(url)
-        tweet = api.get_status(tweet_id, tweet_mode="extended")
-        print("Tweet text:", tweet.full_text)
-        similarity = similarity_score(subject, tweet.full_text)
-        if similarity > 0.75:
-            print("Relevant")
-            return url, subject + ". With full context: " + tweet.full_text
+
+            if response.status_code == 200:
+                print("Tweet text:", response.json)
+                similarity = similarity_score(subject, tweet.full_text)
+                if similarity > 0.75:
+                    print("Relevant")
+                    return url, subject + ". With full context: " + tweet.full_text
+            else:
+                print("Error in scrape_twitter", response)
+                return "N/A", subject
+    except Exception as e:
+        print("Exception in scrape_twitter:", e)
+        return "N/A", subject
 
 def get_tweet_id(url):
     match = re.search(r"status/(\d+)", url)
