@@ -559,7 +559,8 @@ def scrape_google(subject):
     try:
         url_encoded_subject = url_encode_string(subject)
         # Search Operators https://moz.com/learn/seo/search-operators
-        full_url = 'https://www.google.com/search?q="' + url_encoded_subject + '"+site%3Atwitter.com+OR+site%3Aseekingalpha.com+OR+site%3Areuters.com+OR+site%3Amarketscreener.com+OR+site%3Ayahoo.com'
+        # Remove site: operator: '"+site%3Atwitter.com+OR+site%3Aseekingalpha.com+OR+site%3Areuters.com+OR+site%3Amarketscreener.com+OR+site%3Ayahoo.com'
+        full_url = 'https://www.google.com/search?q="' + url_encoded_subject
         print("Trying url " + full_url)
 
         # response = requests_get(full_url)
