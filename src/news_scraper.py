@@ -56,10 +56,13 @@ def split_sentence(sentence):
     # Split based on http
     if 'http' in remaining_sentence:
         parts = remaining_sentence.split()
+        parts.reverse()  # Reverse the list
         for word in parts:
             if 'http' in word:
                 url.append(word)
                 remaining_sentence = remaining_sentence.replace(word, '').strip()
+                break  # Break the loop after finding the last 'http'
+        remaining_sentence = remaining_sentence[::-1]  # Reverse the sentence back to its original order
     # Delete "- " and leading/trailing spaces
     remaining_sentence = remaining_sentence.replace("- ", "").replace("\n", "").strip()
 
@@ -180,7 +183,7 @@ def scraping(link, subject):
         url, subject = scrape_business_wire_article_page(link, subject)
     elif "cnbc.com" in link:
         print("Found 1 CNBC link:", link)
-        url, subject = scrape_cnbc_article_page(link, subject)
+        url, subject = scrape_cnbc.scrape_cnbc_article_page(link, subject)
     else:
         print("Unrecognized link type: " + link)
 
@@ -800,7 +803,8 @@ def select_column_and_classify():
                     if link:
                         print("Financial statement:", remaining_sentence, "Link:", link)
                         url, contextualized_sentence = scraping(link, remaining_sentence)
-
+                        if url == 'N/A':
+                            url, contextualized_sentence = scrape_google(remaining_sentence)
                     else:
                         print("Financial statement:", remaining_sentence)
                         url, contextualized_sentence = scrape_google(remaining_sentence)

@@ -4,6 +4,8 @@ from bs4 import BeautifulSoup
 import sys
 sys.path.append("..")
 
+# Test: https://uk.movies.yahoo.com/amphtml/tyson-foods-inc-first-quarter-183314970.html "Tyson Foods, Inc. First-Quarter Results Just Came Out: Here's What Analysts Are Forecasting For Next Year"
+
 def requests_get(url):
     try:
         return requests.get(url)
@@ -34,12 +36,12 @@ def scrape_yahoo(subject):
         url_encoded_subject = url_encode_string(subject)
 
         full_url = 'https://seekingalpha.com/search?q=' + url_encoded_subject + '&tab=headlines'
-        print("Trying url " + full_url)
+        # print("Trying url " + full_url)
         response = requests_get(full_url)
         soup = BeautifulSoup(response.content, 'html.parser')
         link_elements = soup.select('a[data-test-id="post-list-item-title"]')
         links = [link['href'] for link in link_elements]
-        print("Found " + str(len(links)))
+        # print("Found " + str(len(links)))
 
         for link in links:
             full_link = "https://seekingalpha.com/" + link
@@ -58,17 +60,17 @@ def scrape_yahoo_finance_article_page(url, subject):
     try:
         response = requests_get(url)
         soup = BeautifulSoup(response.content, 'html.parser')
-        print("Response status code:", response.status_code)
-        print("Response headers:", response.headers)
-        print("Response content:", response.content)
+        # print("Response status code:", response.status_code)
+        # print("Response headers:", response.headers)
+        # print("Response content:", response.content)
 
         headline_article = soup.find('article')
         # print("Headline div:", headline_article)
         headline_header = headline_article.find('header')
-        print("Headline header:", headline_header)
+        # print("Headline header:", headline_header)
         headline_text = headline_header.find('h1').text.strip()
         # headline_text = headline_div.find('h1').text.strip()
-        print("Headline:", headline_text)
+        # print("Headline:", headline_text)
 
         similarity = similarity_score(subject, headline_text)
         if similarity > 0.8:
