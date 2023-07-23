@@ -15,6 +15,7 @@ import easygui as gui
 import requests_url
 from requests_url import requests_get
 from scrapers.yahoo import scrape_yahoo
+from sentence_processing.split_sentence import split_sentence
 
 import tweepy
 from selenium import webdriver
@@ -39,42 +40,6 @@ twitter_bearer_token = os.getenv("TWITTER_BEARER_TOKEN")
 auth = tweepy.OAuth1UserHandler(twitter_api_key, twitter_api_key_secret, twitter_access_token, twitter_access_token_secret)
 api = tweepy.API(auth)
 
-# Sentence Tokenization methods:
-import re
-
-
-def split_sentence(sentence):
-    ticker = []
-    url = []
-    remaining_sentence = sentence
-
-    # Process sentence:
-    # Split based on $
-    ticker_matches = re.findall(r'^\$[A-Z]+', remaining_sentence)
-    for match in ticker_matches:
-        ticker.append(match.strip('$'))
-        remaining_sentence = remaining_sentence.replace(match, '').strip()
-
-    # Split based on http
-    # Create a list of all 'http' words
-    http_words = [word for word in remaining_sentence.split() if 'http' in word]
-
-    # Remove all 'http' words from the sentence
-    for http_word in http_words:
-        remaining_sentence = remaining_sentence.replace(http_word, '').strip()
-
-    # Take the last 'http' word as the url
-    if http_words:
-        url.append(http_words[-1])
-
-    # Delete "- " and leading/trailing spaces
-    remaining_sentence = remaining_sentence.replace("- ", "").replace("\n", "").strip()
-
-    # Process url:
-    if url:  # Make sure url is not empty
-        url = requests_url.get_redirected_domain(url[0])
-
-    return ticker, remaining_sentence, url
 
 
 # Classification methods:
