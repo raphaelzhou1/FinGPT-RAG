@@ -149,11 +149,11 @@ def scraping(link, subject):
         url, subject = scrape_reuters(subject)
         if url != "N/A":
             return url, subject
-    elif "twitter.com" in link:
-        print("Found 1 Twitter link:", link)
-        url, subject = scrape_twitter(link, subject)
-        if url != "N/A":
-            return url, subject
+    # elif "twitter.com" in link:
+    #     print("Found 1 Twitter link:", link)
+    #     url, subject = scrape_twitter(link, subject)
+    #     if url != "N/A":
+    #         return url, subject
     elif "marketscreener.com" in link:
         print("Found 1 Market Screener link:", link)
         url, subject = scrape_market_screen_article_page(link, subject)
@@ -850,14 +850,13 @@ def select_column_and_classify():
                     if link:
                         print("Financial statement:", remaining_sentence, "Link:", link)
                         url, contextualized_sentence = scraping(link, remaining_sentence)
-                        df.at[row_index, "link"] = url
-                        df.at[row_index, "contextualized_sentence"] = contextualized_sentence
 
-                    # else:
-                    #     print("Financial statement:", remaining_sentence)
-                    #     url, contextualized_sentence = scrape_google(remaining_sentence)
+                    else:
+                        print("Financial statement:", remaining_sentence)
+                        url, contextualized_sentence = scrape_google(remaining_sentence)
 
-
+                    df.at[row_index, "link"] = url
+                    df.at[row_index, "contextualized_sentence"] = contextualized_sentence
 
                     counter += 1
 

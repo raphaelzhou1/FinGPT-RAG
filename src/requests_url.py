@@ -23,24 +23,24 @@ def requests_get(url, proxy=None):
         client = ZenRowsClient("6026db40fdbc3db28235753087be6225f047542f")
         params = {"js_render": "true", "antibot": "true"}
 
-        # user_agents = [
-        #     'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/113.0',
-        #     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
-        #     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
-        #     'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
-        #     # Add more User-Agent strings as needed
-        # ]
+        user_agents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/113.0',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
+            # Add more User-Agent strings as needed
+        ]
 
-        # headers = {
-        #     'User-Agent': random.choice(user_agents),
-        #     'Referer': 'https://seekingalpha.com/search?q=&tab=headlines'
-        # }
+        headers = {
+            'User-Agent': random.choice(user_agents),
+            'Referer': 'https://seekingalpha.com/search?q=&tab=headlines'
+        }
 
         # print("Headers:", headers)
-        # session = requests.Session()
-        # session.headers.update(headers)
-        # response = session.get(url)
-        response = requests.get(url)
+        session = requests.Session()
+        session.headers.update(headers)
+        response = session.get(url)
+        # response = requests.get(url)
         # response = requests.get(url, headers=headers.getHeaders(1))
         return response
     except Exception as e:
