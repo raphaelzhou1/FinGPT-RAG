@@ -9,16 +9,18 @@ import urllib.parse
 from dotenv import load_dotenv
 import pandas as pd
 from bs4 import BeautifulSoup
-import requests_url
 import easygui as gui
 
 # From src/
+import requests_url
 from requests_url import requests_get
+from scrapers.yahoo import scrape_yahoo
 
 import tweepy
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from searchtweets import load_credentials
+
 
 # TODO: Twitter API requests # https://twitter.com/bryan4665/
 
@@ -166,7 +168,7 @@ def scraping(link, subject):
             return url, subject
     elif "yahoo.com" in link:
         print("Found 1 Yahoo Finance link:", link)
-        url, subject = scrape_yahoo_finance_article_page(link, subject)
+        url, subject = scrape_yahoo.scrape_yahoo_finance_article_page(link, subject)
     elif "marketwatch.com" in link:
         print("Found 1 MarketWatch link:", link)
         url, subject = scrape_market_watch_article_page(link, subject)
@@ -542,6 +544,10 @@ def scrape_cnbc_article_page(url, subject):
             print("Relevant")
             print("Context:", context)
             return url, subject + ". With full context: " + context
+        else:
+            print("Not relevant")
+            return "N/A", subject
+
     except Exception as e:
         print("Exception in scrape_cnbc_article_page:", e)
         return "N/A", subject
@@ -717,62 +723,6 @@ def webdrive_twitter(url):
         return None
     finally:
         driver.quit()
-
-def scrape_yahoo(subject):
-    try:
-        url_encoded_subject = url_encode_string(subject)
-
-        full_url = 'https://seekingalpha.com/search?q=' + url_encoded_subject + '&tab=headlines'
-        print("Trying url " + full_url)
-        response = requests_get(full_url)
-        soup = BeautifulSoup(response.content, 'html.parser')
-        link_elements = soup.select('a[data-test-id="post-list-item-title"]')
-        links = [link['href'] for link in link_elements]
-        print("Found " + str(len(links)))
-
-        for link in links:
-            full_link = "https://seekingalpha.com/" + link
-            print("Link:", full_link)
-
-            response = requests_get(full_link)
-            soup = BeautifulSoup(response.content, 'html.parser')
-
-        print("Context not found in Yahoo")
-        return "N/A", subject
-    except Exception as e:
-        print("Error in Yahoo:", e)
-        return "N/A", subject
-
-def scrape_yahoo_finance_article_page(url, subject):
-    try:
-        response = requests_get(url)
-        soup = BeautifulSoup(response.content, 'lxml-xml')
-
-        headline_div = soup.find('div', {'class': 'caas-title-wrapper'})
-        headline_text = headline_div.find('h1').text.strip()
-        print("Headline:", headline_text)
-
-        similarity = similarity_score(subject, headline_text)
-        if similarity > 0.8:
-            # if news_format == "type_1":
-            print("Relevant")
-            paragraph_div = soup.find('div', {'class': 'caas-body'})
-            paragraph_elements = paragraph_div.find_all('p')
-            paragraph_text = ' '.join([p.text.strip() for p in paragraph_elements])
-            print("Context:", paragraph_text)
-            return url, subject + ". With full context: " + paragraph_text
-            # elif news_format == "type_2":
-            #     print("Relevant")
-            #     paragraph_elements = soup.select('p[class^="text__text__"]')
-            #     paragraph_text = ' '.join([p.text.strip() for p in paragraph_elements])
-            #     print("Context:", paragraph_text)
-            #     return full_link, subject + ". With full context: " + paragraph_text
-        else:
-            print("Not relevant")
-
-    except Exception as e:
-        print("Exception in scrape_yahoo_finance_article_page:", e)
-        return "N/A", subject
 
 
 # Function that handles classification of sentences using OpenAI and scraping of news websites
