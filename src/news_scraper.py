@@ -42,6 +42,7 @@ api = tweepy.API(auth)
 # Sentence Tokenization methods:
 import re
 
+
 def split_sentence(sentence):
     ticker = []
     url = []
@@ -53,21 +54,25 @@ def split_sentence(sentence):
     for match in ticker_matches:
         ticker.append(match.strip('$'))
         remaining_sentence = remaining_sentence.replace(match, '').strip()
+
     # Split based on http
-    if 'http' in remaining_sentence:
-        parts = remaining_sentence.split()
-        parts.reverse()  # Reverse the list
-        for word in parts:
-            if 'http' in word:
-                url.append(word)
-                remaining_sentence = remaining_sentence.replace(word, '').strip()
-                break  # Break the loop after finding the last 'http'
-        remaining_sentence = remaining_sentence[::-1]  # Reverse the sentence back to its original order
+    # Create a list of all 'http' words
+    http_words = [word for word in remaining_sentence.split() if 'http' in word]
+
+    # Remove all 'http' words from the sentence
+    for http_word in http_words:
+        remaining_sentence = remaining_sentence.replace(http_word, '').strip()
+
+    # Take the last 'http' word as the url
+    if http_words:
+        url.append(http_words[-1])
+
     # Delete "- " and leading/trailing spaces
     remaining_sentence = remaining_sentence.replace("- ", "").replace("\n", "").strip()
 
     # Process url:
-    url = requests_url.get_redirected_domain(url)
+    if url:  # Make sure url is not empty
+        url = requests_url.get_redirected_domain(url[0])
 
     return ticker, remaining_sentence, url
 
