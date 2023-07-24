@@ -5,6 +5,7 @@ import sys
 sys.path.append("..")
 
 # Tested: python src/scrapers/cnbc/scrape_cnbc.py https://www.cnbc.com/2020/01/02/fda-issues-ban-on-some-flavored-vaping-products.html "FDA issues ban on some fruit and mint flavored vaping products"
+# https://www.cnbc.com/2019/12/06/amazon-blames-holiday-delivery-delays-on-winter-storms-and-high-demand.html?__source=twitter%7Cmain "Amazon blames holiday delivery delays on winter storms and high demand"
 
 def requests_get(url):
     try:

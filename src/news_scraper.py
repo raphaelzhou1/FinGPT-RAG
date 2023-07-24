@@ -11,17 +11,18 @@ import pandas as pd
 from bs4 import BeautifulSoup
 import easygui as gui
 
-# From src/
-import requests_url
-from requests_url import requests_get
-from scrapers.yahoo import scrape_yahoo
-from sentence_processing.split_sentence import split_sentence
-
+# Scraper tools:
 import tweepy
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from searchtweets import load_credentials
 
+# From src/
+import requests_url
+from requests_url import requests_get
+from scrapers.yahoo import scrape_yahoo
+from sentence_processing.split_sentence import split_sentence
+from scrapers.cnbc import scrape_cnbc
 
 # TODO: Twitter API requests # https://twitter.com/bryan4665/
 
@@ -530,7 +531,7 @@ def scrape_google(subject):
         url_encoded_subject = url_encode_string(subject)
         # Search Operators https://moz.com/learn/seo/search-operators
         # Remove site: operator: '"+site%3Atwitter.com+OR+site%3Aseekingalpha.com+OR+site%3Areuters.com+OR+site%3Amarketscreener.com+OR+site%3Ayahoo.com'
-        full_url = 'https://www.google.com/search?q="' + url_encoded_subject
+        full_url = 'https://www.google.com/search?q="' + url_encoded_subject + '"'
         print("Trying url " + full_url)
 
         # response = requests_get(full_url)
@@ -763,6 +764,9 @@ def select_column_and_classify():
                     raise ValueError("Invalid context classification column selection")
 
                 counter = 0  # Counter variable to track the number of rows processed
+                row_index = gui.enterbox("Enter the row index to classify", "Row Index Input")
+                if row_index is None or not row_index_input.isdigit() or int(row_index_input) >= len(df):
+                    row_index = 1
                 for row_index, row in df.iterrows():
                     # If role is not empty or N/A or has the same sentence as "contextualized_sentence", means context is added, then skip
                     if process_existing_file and row["link"] != "N/A" and not pd.isnull(row["link"]) and row[sentence_column] != row["contextualized_sentence"]:

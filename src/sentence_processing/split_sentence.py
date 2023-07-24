@@ -20,7 +20,7 @@ def split_sentence(sentence):
 
     # Process sentence:
     # Split based on $
-    ticker_matches = re.findall(r'\$\w+', remaining_sentence)
+    ticker_matches = re.findall(r'^\$[A-Za-z]+', remaining_sentence)
     for match in ticker_matches:
         ticker.append(match.strip('$'))
         remaining_sentence = remaining_sentence.replace(match, '').strip()
@@ -29,8 +29,6 @@ def split_sentence(sentence):
     # Create a list of all 'http' words
     http_words = [word for word in remaining_sentence.split() if word.startswith('http')]
 
-    # print("Http words:", http_words)
-
     # Remove all 'http' words from the sentence
     for http_word in http_words:
         remaining_sentence = remaining_sentence.replace(http_word, '').strip()
@@ -38,8 +36,6 @@ def split_sentence(sentence):
     # Take the last 'http' word as the url
     if http_words:
         url.append(http_words[-1])
-
-    # print("url:", url)
 
     # Delete "- " and leading/trailing spaces
     remaining_sentence = remaining_sentence.replace("- ", "").replace("\n", "").strip()
@@ -57,7 +53,6 @@ def main():
         print("Split Result:", result)
     else:
         print("No sentence provided")
-
 
 if __name__ == "__main__":
     main()
