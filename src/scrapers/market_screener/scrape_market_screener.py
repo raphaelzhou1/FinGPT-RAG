@@ -28,20 +28,20 @@ def similarity_score(a, b):
 def scrape_market_screen_article_page(url, subject):
     try:
         response = requests_get(url)
-        print("response", response.content)
+        # print("response", response.content)
         soup = BeautifulSoup(response.content, 'lxml-xml')
 
         headline_text = soup.select('h1.title.title__primary.mb-15.txt-bold')[0].text.strip()
-        print("Headline:", headline_text)
+        # print("Headline:", headline_text)
 
         similarity = similarity_score(subject, headline_text)
         if similarity > 0.8:
-            print("Relevant")
+            # print("Relevant")
 
 
             context = ""
             heightlight_p = soup.find('p', {'class': 'txt-s4 mb-15 txt-bold article-chapo mt-0'})
-            print("heightlight_p", heightlight_p)
+            # print("heightlight_p", heightlight_p)
             if heightlight_p:
                 context += heightlight_p.text.strip()
                 return url, subject + ". With full context: " + context
