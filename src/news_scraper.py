@@ -3,6 +3,7 @@ import time
 import sys
 import json
 import re
+import itertools
 import multiprocessing
 import requests
 import urllib.parse
@@ -23,6 +24,7 @@ from requests_url import requests_get
 from scrapers.yahoo import scrape_yahoo
 from sentence_processing.split_sentence import split_sentence
 from scrapers.cnbc import scrape_cnbc
+from scrapers.market_screener import scrape_market_screener
 
 # TODO: Twitter API requests # https://twitter.com/bryan4665/
 
@@ -132,7 +134,7 @@ def scraping(link, subject):
     #         return url, subject
     elif "marketscreener.com" in link:
         print("Found 1 Market Screener link:", link)
-        url, subject = scrape_market_screen_article_page(link, subject)
+        url, subject = scrape_market_screener.scrape_market_screen_article_page(link, subject)
         if url != "N/A":
             return url, subject
     elif "bloomberg.com" in link:
@@ -463,39 +465,6 @@ def scrape_seeking_alpha_article_page(url, subject):
         print("Exception in scrape_seeking_alpha_article_page:", e)
         return "N/A", subject
 
-def scrape_market_screen_article_page(url, subject):
-    try:
-        response = requests_get(url)
-        soup = BeautifulSoup(response.content, 'lxml-xml')
-
-        headline_text = soup.select('h1', {'class': 'title title__primary mb-15 txt-bold'}).text.strip()
-        print("Headline:", headline_text)
-
-        similarity = similarity_score(subject, headline_text)
-        if similarity > 0.8:
-            print("Relevant")
-
-            context = ""
-            divs = soup.find_all('div', {'class': 'txt-s4 article-text  article-comm'})
-            if divs:
-                for div in divs:
-                    paragraphs = div.find_all('p').text.strip()
-                    if paragraphs:
-                        for paragraph in paragraphs:
-                            bold_paragraph = paragraph.find('strong')
-                            if bold_paragraph:
-                                context += bold_paragraph.text.strip()
-                            else:
-                                context += paragraph.text.strip()
-
-            print("Context:", context)
-            return url, subject + ". With full context: " + context
-        else:
-            print("Not relevant")
-            return "N/A", subject
-    except Exception as e:
-        print("Exception in scrape_seeking_alpha_article_page:", e)
-        return "N/A", subject
 
 # def scrape_zero_hedge_article_page(url, subject):
 
@@ -764,10 +733,13 @@ def select_column_and_classify():
                     raise ValueError("Invalid context classification column selection")
 
                 counter = 0  # Counter variable to track the number of rows processed
-                row_index = gui.enterbox("Enter the row index to classify", "Row Index Input")
-                if row_index is None or not row_index.isdigit() or int(row_index) >= len(df):
-                    row_index = 1
-                for row_index, row in df.iterrows():
+                row_index_input = gui.enterbox("Enter the row index to classify", "Row Index Input")
+                if row_index_input is None or not row_index_input.isdigit() or int(row_index_input) >= len(df):
+                    row_index = 1  # Set a default starting index
+                else:
+                    row_index = int(row_index_input)
+
+                for row_index, row in itertools.islice(df.iterrows(), row_index, None):
                     # If role is not empty or N/A or has the same sentence as "contextualized_sentence", means context is added, then skip
                     if process_existing_file and row["link"] != "N/A" and not pd.isnull(row["link"]) and row[sentence_column] != row["contextualized_sentence"]:
                         continue
