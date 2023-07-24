@@ -765,7 +765,7 @@ def select_column_and_classify():
 
                 counter = 0  # Counter variable to track the number of rows processed
                 row_index = gui.enterbox("Enter the row index to classify", "Row Index Input")
-                if row_index is None or not row_index_input.isdigit() or int(row_index_input) >= len(df):
+                if row_index is None or not row_index.isdigit() or int(row_index) >= len(df):
                     row_index = 1
                 for row_index, row in df.iterrows():
                     # If role is not empty or N/A or has the same sentence as "contextualized_sentence", means context is added, then skip
